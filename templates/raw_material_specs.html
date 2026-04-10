@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title_extra %} — Raw Material Specs{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Raw Material Specifications</h1>
+        <p>Manage incoming raw material specs and test parameters</p>
+    </div>
+    <a href="{{ url_for('rm_spec_new') }}" class="btn btn-primary">+ New Spec</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="GET" class="filter-bar">
+            <input type="text" class="form-control" name="q" value="{{ search }}" placeholder="Search specs...">
+            <select class="form-control" name="status" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <option value="draft" {{ 'selected' if status_filter == 'draft' }}>Draft</option>
+                <option value="active" {{ 'selected' if status_filter == 'active' }}>Active</option>
+                <option value="superseded" {{ 'selected' if status_filter == 'superseded' }}>Superseded</option>
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if specs %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Spec #</th>
+                        <th>Material Name</th>
+                        <th>CAS #</th>
+                        <th>Supplier</th>
+                        <th>Rev</th>
+                        <th>Status</th>
+                        <th>Created By</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in specs %}
+                    <tr>
+                        <td><a href="{{ url_for('rm_spec_detail', spec_id=s.id) }}"><strong>{{ s.spec_number }}</strong></a></td>
+                        <td>{{ s.material_name }}</td>
+                        <td>{{ s.cas_number or '—' }}</td>
+                        <td>{{ s.supplier or '—' }}</td>
+                        <td>{{ s.revision }}</td>
+                        <td><span class="badge badge-{{ s.status }}">{{ s.status|title }}</span></td>
+                        <td>{{ s.creator_name or '—' }}</td>
+                        <td><a href="{{ url_for('rm_spec_detail', spec_id=s.id) }}" class="btn btn-sm btn-outline">View</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No raw material specifications found.</p>
+            <a href="{{ url_for('rm_spec_new') }}" class="btn btn-primary btn-sm">Create First Spec</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

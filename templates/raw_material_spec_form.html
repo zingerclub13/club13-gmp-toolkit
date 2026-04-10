@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title_extra %} — {{ 'Edit' if spec else 'New' }} Raw Material Spec{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ 'Edit' if spec else 'New' }} Raw Material Specification</h1>
+        <p>{{ spec.spec_number if spec else 'Define material, test parameters, and acceptance criteria' }}</p>
+    </div>
+    {% if spec %}
+    <a href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}" class="btn btn-outline">Cancel</a>
+    {% else %}
+    <a href="{{ url_for('rm_specs_list') }}" class="btn btn-outline">Cancel</a>
+    {% endif %}
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">Specification Details</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="spec_number">Spec Number *</label>
+                    <input type="text" class="form-control" id="spec_number" name="spec_number" value="{{ spec.spec_number if spec else '' }}" required placeholder="e.g. RM-001">
+                </div>
+                <div class="form-group">
+                    <label for="material_name">Material Name *</label>
+                    <input type="text" class="form-control" id="material_name" name="material_name" value="{{ spec.material_name if spec else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="material_code">Material Code</label>
+                    <input type="text" class="form-control" id="material_code" name="material_code" value="{{ spec.material_code if spec else '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="supplier">Supplier</label>
+                    <input type="text" class="form-control" id="supplier" name="supplier" value="{{ spec.supplier if spec else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="cas_number">CAS Number</label>
+                    <input type="text" class="form-control" id="cas_number" name="cas_number" value="{{ spec.cas_number if spec else '' }}" placeholder="e.g. 5743-28-2">
+                </div>
+                <div class="form-group">
+                    <label for="revision">Revision</label>
+                    <input type="text" class="form-control" id="revision" name="revision" value="{{ spec.revision if spec else '00' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="effective_date">Effective Date</label>
+                    <input type="date" class="form-control" id="effective_date" name="effective_date" value="{{ spec.effective_date if spec else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select class="form-control" id="status" name="status">
+                        <option value="draft" {{ 'selected' if spec and spec.status == 'draft' }}>Draft</option>
+                        <option value="active" {{ 'selected' if spec and spec.status == 'active' }}>Active</option>
+                        <option value="superseded" {{ 'selected' if spec and spec.status == 'superseded' }}>Superseded</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="3">{{ spec.description if spec else '' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Test Parameters
+            <span class="card-subtle">Define the tests that will be performed on incoming materials</span>
+        </div>
+        <div class="card-body">
+            <div class="param-rows rm-param-rows" id="paramRows">
+                <div class="param-row rm-5col" style="margin-bottom:4px;">
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Parameter Name</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Test Method</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Acceptance Criteria</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Table</label>
+                    <span></span>
+                </div>
+                {% if parameters %}
+                {% for p in parameters %}
+                <div class="param-row rm-5col">
+                    <input type="text" class="form-control" name="param_name[]" value="{{ p.parameter_name }}" placeholder="e.g. Identity">
+                    <input type="text" class="form-control" name="param_method[]" value="{{ p.test_method }}" placeholder="e.g. HPLC">
+                    <input type="text" class="form-control" name="param_criteria[]" value="{{ p.acceptance_criteria }}" placeholder="e.g. ≥ 95%">
+                    <select class="form-control" name="param_type[]">
+                        <option value="direct" {{ 'selected' if p.parameter_type == 'direct' }}>Direct Test</option>
+                        <option value="coa" {{ 'selected' if p.parameter_type == 'coa' }}>From C of A</option>
+                    </select>
+                    <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="param-row rm-5col">
+                    <input type="text" class="form-control" name="param_name[]" placeholder="e.g. Identity">
+                    <input type="text" class="form-control" name="param_method[]" placeholder="e.g. HPLC">
+                    <input type="text" class="form-control" name="param_criteria[]" placeholder="e.g. ≥ 95%">
+                    <select class="form-control" name="param_type[]">
+                        <option value="direct">Direct Test</option>
+                        <option value="coa">From C of A</option>
+                    </select>
+                    <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endif %}
+            </div>
+            <button type="button" class="btn-add-row" onclick="addParamRow()">+ Add Parameter</button>
+        </div>
+    </div>
+
+    <div class="actions-bar">
+        <button type="submit" class="btn btn-primary">{{ 'Save Changes' if spec else 'Create Specification' }}</button>
+        {% if spec %}
+        <a href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}" class="btn btn-outline">Cancel</a>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addParamRow() {
+    const rows = document.getElementById('paramRows');
+    const row = document.createElement('div');
+    row.className = 'param-row rm-5col';
+    row.innerHTML = `
+        <input type="text" class="form-control" name="param_name[]" placeholder="e.g. Identity">
+        <input type="text" class="form-control" name="param_method[]" placeholder="e.g. HPLC">
+        <input type="text" class="form-control" name="param_criteria[]" placeholder="e.g. ≥ 95%">
+        <select class="form-control" name="param_type[]">
+            <option value="direct">Direct Test</option>
+            <option value="coa">From C of A</option>
+        </select>
+        <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    rows.appendChild(row);
+}
+</script>
+{% endblock %}

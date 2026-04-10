@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title_extra %} — SOPs{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Standard Operating Procedures</h1>
+        <p>Manage SOPs with revision control</p>
+    </div>
+    <a href="{{ url_for('sop_new') }}" class="btn btn-primary">+ New SOP</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="GET" class="filter-bar">
+            <input type="text" class="form-control" name="q" value="{{ search }}" placeholder="Search SOPs...">
+            <select class="form-control" name="status" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <option value="draft" {{ 'selected' if status_filter == 'draft' }}>Draft</option>
+                <option value="active" {{ 'selected' if status_filter == 'active' }}>Active</option>
+                <option value="superseded" {{ 'selected' if status_filter == 'superseded' }}>Superseded</option>
+            </select>
+            <select class="form-control" name="department" onchange="this.form.submit()">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                <option value="{{ d.department }}" {{ 'selected' if dept_filter == d.department }}>{{ d.department }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if sops %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>SOP #</th>
+                        <th>Title</th>
+                        <th>Department</th>
+                        <th>Rev</th>
+                        <th>Effective</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sops %}
+                    <tr>
+                        <td><a href="{{ url_for('sop_detail', sop_id=s.id) }}"><strong>{{ s.sop_number }}</strong></a></td>
+                        <td>{{ s.title }}</td>
+                        <td>{{ s.department or '—' }}</td>
+                        <td>{{ s.revision }}</td>
+                        <td>{{ s.effective_date or '—' }}</td>
+                        <td><span class="badge badge-{{ s.status }}">{{ s.status|title }}</span></td>
+                        <td><a href="{{ url_for('sop_detail', sop_id=s.id) }}" class="btn btn-sm btn-outline">View</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No SOPs found.</p>
+            <a href="{{ url_for('sop_new') }}" class="btn btn-primary btn-sm">Create First SOP</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

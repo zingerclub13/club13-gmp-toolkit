@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title_extra %} — {{ 'Edit' if user else 'New' }} User{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ 'Edit' if user else 'New' }} User</h1>
+        <p>{{ user.full_name if user else 'Create a new system user' }}</p>
+    </div>
+    <a href="{{ url_for('users_list') }}" class="btn btn-outline">Cancel</a>
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">User Details</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" class="form-control" id="username" name="username" value="{{ user.username if user else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="full_name">Full Name *</label>
+                    <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user.full_name if user else '' }}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Password {{ '(leave blank to keep current)' if user else '*' }}</label>
+                    <input type="password" class="form-control" id="password" name="password" {{ '' if user else 'required' }}>
+                </div>
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select class="form-control" id="role" name="role">
+                        <option value="staff" {{ 'selected' if user and user.role == 'staff' }}>Staff</option>
+                        <option value="manager" {{ 'selected' if user and user.role == 'manager' }}>Manager</option>
+                        <option value="admin" {{ 'selected' if user and user.role == 'admin' }}>Admin</option>
+                    </select>
+                </div>
+            </div>
+            {% if user %}
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="active" value="1" {{ 'checked' if user.active }}> Active
+                </label>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="actions-bar">
+        <button type="submit" class="btn btn-primary">{{ 'Save Changes' if user else 'Create User' }}</button>
+        <a href="{{ url_for('users_list') }}" class="btn btn-outline">Cancel</a>
+    </div>
+</form>
+{% endblock %}

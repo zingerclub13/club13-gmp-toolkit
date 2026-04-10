@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title_extra %} — Users{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>User Management</h1>
+        <p>Manage system users and roles</p>
+    </div>
+    <a href="{{ url_for('user_new') }}" class="btn btn-primary">+ New User</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if users %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td><strong>{{ u.username }}</strong></td>
+                        <td>{{ u.full_name }}</td>
+                        <td><span class="badge badge-{{ u.role }}">{{ u.role|title }}</span></td>
+                        <td>
+                            {% if u.active %}
+                            <span class="badge badge-active">Active</span>
+                            {% else %}
+                            <span class="badge badge-superseded">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ u.created_at[:10] if u.created_at else '—' }}</td>
+                        <td><a href="{{ url_for('user_edit', user_id=u.id) }}" class="btn btn-sm btn-outline">Edit</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No users found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

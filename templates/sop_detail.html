@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title_extra %} — {{ sop.sop_number }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ sop.sop_number }}</h1>
+        <p>{{ sop.title }}</p>
+    </div>
+    <div class="actions-bar">
+        {% if has_template %}
+        <a href="{{ url_for('sop_download', sop_id=sop.id) }}" class="btn btn-primary">⬇ Download .docx</a>
+        {% else %}
+        <span class="btn btn-outline" style="opacity:0.5;cursor:not-allowed;" title="Upload SOP template in Settings first">⬇ Template Missing</span>
+        {% endif %}
+        {% if sop.status != 'superseded' %}
+        <a href="{{ url_for('sop_revise', sop_id=sop.id) }}" class="btn btn-outline">Create Revision</a>
+        {% endif %}
+        <a href="{{ url_for('sop_edit', sop_id=sop.id) }}" class="btn btn-outline">Edit</a>
+        {% if session.get('role') in ('admin', 'manager') %}
+        <form method="POST" action="{{ url_for('sop_delete', sop_id=sop.id) }}" style="display:inline;" onsubmit="return confirm('Delete this SOP?')">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        SOP Information
+        <span class="badge badge-{{ sop.status }}">{{ sop.status|title }}</span>
+    </div>
+    <div class="card-body">
+        <div class="detail-grid">
+            <div class="detail-item">
+                <div class="detail-label">SOP Number</div>
+                <div class="detail-value">{{ sop.sop_number }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Title</div>
+                <div class="detail-value">{{ sop.title }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Department</div>
+                <div class="detail-value">{{ sop.department or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Revision</div>
+                <div class="detail-value">{{ sop.revision }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Effective Date</div>
+                <div class="detail-value">{{ sop.effective_date or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Next Review Date</div>
+                <div class="detail-value">{{ sop.review_date or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Created By</div>
+                <div class="detail-value">{{ sop.creator_name or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Last Updated</div>
+                <div class="detail-value">{{ sop.updated_at[:16] if sop.updated_at else '—' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% macro sop_section(title, content) %}
+{% if content %}
+<div class="card">
+    <div class="card-header">{{ title }}</div>
+    <div class="card-body">
+        <div class="sop-content">{{ content|replace('\n', '<br>')|safe }}</div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ sop_section('1. Purpose', sop.purpose) }}
+{{ sop_section('2. Scope', sop.scope) }}
+{{ sop_section('3. Responsibilities', sop.responsibilities) }}
+{{ sop_section('4. Definitions', sop.definitions) }}
+{{ sop_section('5. Procedure', sop.procedure_text) }}
+{{ sop_section('6. Equipment & Materials', sop.equipment_materials) }}
+{{ sop_section('7. References', sop.references_text) }}
+
+{% if revision_history %}
+<div class="card">
+    <div class="card-header">Revision History</div>
+    <div class="card-body">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rev #</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Approved By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in revision_history %}
+                    <tr>
+                        <td><strong>{{ h.revision }}</strong></td>
+                        <td>{{ h.date or '—' }}</td>
+                        <td>{{ h.description or '—' }}</td>
+                        <td>{{ h.approved_by or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

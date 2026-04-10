@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p>GMP Document Management Overview</p>
+    </div>
+</div>
+
+{% if not pk_template or not rm_template or not sop_template %}
+<div class="template-status">
+    <div>
+        <strong>Template Status</strong> — Upload your .dotx templates to enable document generation.
+        {% if session.get('role') in ('admin', 'manager') %}
+        <a href="{{ url_for('template_settings') }}" style="text-decoration:underline;">Upload Templates</a>
+        {% endif %}
+        <div class="template-check">
+            <span class="check-icon">{{ '✓' if pk_template else '✗' }}</span>
+            PK Specification Test Record Template
+        </div>
+        <div class="template-check">
+            <span class="check-icon">{{ '✓' if rm_template else '✗' }}</span>
+            RM Specification Test Record Template
+        </div>
+        <div class="template-check">
+            <span class="check-icon">{{ '✓' if sop_template else '✗' }}</span>
+            SOP Template
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Active PK Specs</div>
+        <div class="stat-value">{{ pk_count }}</div>
+        {% if pk_draft %}<div class="table-meta">{{ pk_draft }} draft{{ 's' if pk_draft != 1 }}</div>{% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active RM Specs</div>
+        <div class="stat-value">{{ rm_count }}</div>
+        {% if rm_draft %}<div class="table-meta">{{ rm_draft }} draft{{ 's' if rm_draft != 1 }}</div>{% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active SOPs</div>
+        <div class="stat-value">{{ sop_count }}</div>
+        {% if sop_draft %}<div class="table-meta">{{ sop_draft }} draft{{ 's' if sop_draft != 1 }}</div>{% endif %}
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            Recent PK Test Records
+            <a href="{{ url_for('pk_specs_list') }}" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body">
+            {% if recent_pk %}
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Spec</th>
+                            <th>Lot #</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_pk %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('pk_test_record_detail', spec_id=r.spec_id, record_id=r.id) }}">{{ r.spec_number }}</a>
+                                <div class="table-meta">{{ r.material_name }}</div>
+                            </td>
+                            <td>{{ r.lot_number }}</td>
+                            <td><span class="badge badge-{{ r.status }}">{{ r.status|title }}</span></td>
+                            <td class="text-muted">{{ r.created_at[:10] if r.created_at else '' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state"><p>No test records yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Recent RM Test Records
+            <a href="{{ url_for('rm_specs_list') }}" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body">
+            {% if recent_rm %}
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Spec</th>
+                            <th>Lot #</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_rm %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('rm_test_record_detail', spec_id=r.spec_id, record_id=r.id) }}">{{ r.spec_number }}</a>
+                                <div class="table-meta">{{ r.material_name }}</div>
+                            </td>
+                            <td>{{ r.lot_number }}</td>
+                            <td><span class="badge badge-{{ r.status }}">{{ r.status|title }}</span></td>
+                            <td class="text-muted">{{ r.created_at[:10] if r.created_at else '' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state"><p>No test records yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if recent_docs %}
+<div class="card">
+    <div class="card-header">
+        Recent Document Downloads
+        <a href="{{ url_for('document_log') }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Document</th><th>Type</th><th>User</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    {% for d in recent_docs %}
+                    <tr>
+                        <td>{{ d.filename }}</td>
+                        <td><span class="badge badge-role">{{ d.doc_type|upper }}</span></td>
+                        <td>{{ d.full_name or 'Unknown' }}</td>
+                        <td class="text-muted">{{ d.created_at[:16] if d.created_at else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

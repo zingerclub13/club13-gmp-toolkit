@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title_extra %} — {{ spec.spec_number }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ spec.spec_number }}</h1>
+        <p>{{ spec.material_name }} — Raw Material Specification</p>
+    </div>
+    <div class="actions-bar">
+        {% if has_template %}
+        <a href="{{ url_for('rm_spec_download', spec_id=spec.id) }}" class="btn btn-primary">⬇ Download Test Record</a>
+        {% else %}
+        <span class="btn btn-outline" style="opacity:0.5;cursor:not-allowed;" title="Upload RM template in Settings first">⬇ Template Missing</span>
+        {% endif %}
+        <a href="{{ url_for('rm_spec_edit', spec_id=spec.id) }}" class="btn btn-outline">Edit</a>
+        {% if session.get('role') in ('admin', 'manager') %}
+        <form method="POST" action="{{ url_for('rm_spec_delete', spec_id=spec.id) }}" style="display:inline;" onsubmit="return confirm('Delete this specification?')">
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Specification Details
+        <span class="badge badge-{{ spec.status }}">{{ spec.status|title }}</span>
+    </div>
+    <div class="card-body">
+        <div class="detail-grid">
+            <div class="detail-item">
+                <div class="detail-label">Spec Number</div>
+                <div class="detail-value">{{ spec.spec_number }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Material Name</div>
+                <div class="detail-value">{{ spec.material_name }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Material Code</div>
+                <div class="detail-value">{{ spec.material_code or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">CAS Number</div>
+                <div class="detail-value">{{ spec.cas_number or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Supplier</div>
+                <div class="detail-value">{{ spec.supplier or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Revision</div>
+                <div class="detail-value">{{ spec.revision }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Effective Date</div>
+                <div class="detail-value">{{ spec.effective_date or '—' }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Created By</div>
+                <div class="detail-value">{{ spec.creator_name or '—' }}</div>
+            </div>
+        </div>
+        {% if spec.description %}
+        <div style="margin-top:16px;">
+            <div class="detail-label">Description</div>
+            <div class="detail-value">{{ spec.description }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if parameters %}
+<div class="card">
+    <div class="card-header">Test Parameters (Characteristics)</div>
+    <div class="card-body">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Characteristic</th>
+                        <th>Test Method</th>
+                        <th>Specifications</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in parameters %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ p.parameter_name }}</strong></td>
+                        <td>{{ p.test_method or '—' }}</td>
+                        <td>{{ p.acceptance_criteria or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p style="margin-top:12px;color:var(--c13-text-muted);font-size:0.85rem;">
+            Download the test record to get a printable form with these characteristics pre-filled. Results and Pass/Fail columns are left blank for hand-filling.
+        </p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

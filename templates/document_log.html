@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title_extra %} — Document Log{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Document Log</h1>
+        <p>Audit trail of generated and downloaded documents</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if logs %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Action</th>
+                        <th>Filename</th>
+                        <th>User</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for l in logs %}
+                    <tr>
+                        <td>{{ l.created_at[:16] if l.created_at else '—' }}</td>
+                        <td><span class="badge badge-{{ l.doc_type }}">{{ l.doc_type|upper|replace('_', ' ') }}</span></td>
+                        <td>{{ l.action|title }}</td>
+                        <td>{{ l.filename or '—' }}</td>
+                        <td>{{ l.full_name or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No documents have been generated yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

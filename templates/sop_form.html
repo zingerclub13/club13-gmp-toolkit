@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title_extra %} — {{ 'Edit' if sop else 'New' }} SOP{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ 'Edit' if sop else 'New' }} Standard Operating Procedure</h1>
+        <p>{{ sop.sop_number ~ ' — ' ~ sop.title if sop else 'Define SOP content, sections, and revision history' }}</p>
+    </div>
+    {% if sop %}
+    <a href="{{ url_for('sop_detail', sop_id=sop.id) }}" class="btn btn-outline">Cancel</a>
+    {% else %}
+    <a href="{{ url_for('sops_list') }}" class="btn btn-outline">Cancel</a>
+    {% endif %}
+</div>
+
+<form method="POST">
+    <div class="card">
+        <div class="card-header">SOP Information</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sop_number">SOP Number *</label>
+                    <input type="text" class="form-control" id="sop_number" name="sop_number" value="{{ sop.sop_number if sop else '' }}" required placeholder="e.g. SOP-QC-001">
+                </div>
+                <div class="form-group">
+                    <label for="title">Title *</label>
+                    <input type="text" class="form-control" id="title" name="title" value="{{ sop.title if sop else '' }}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <input type="text" class="form-control" id="department" name="department" value="{{ sop.department if sop else '' }}" placeholder="e.g. Quality Control">
+                </div>
+                <div class="form-group">
+                    <label for="revision">Revision</label>
+                    <input type="text" class="form-control" id="revision" name="revision" value="{{ sop.revision if sop else '00' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="effective_date">Effective Date</label>
+                    <input type="date" class="form-control" id="effective_date" name="effective_date" value="{{ sop.effective_date if sop else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="review_date">Next Review Date</label>
+                    <input type="date" class="form-control" id="review_date" name="review_date" value="{{ sop.review_date if sop else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select class="form-control" id="status" name="status">
+                        <option value="draft" {{ 'selected' if sop and sop.status == 'draft' }}>Draft</option>
+                        <option value="active" {{ 'selected' if sop and sop.status == 'active' }}>Active</option>
+                        <option value="superseded" {{ 'selected' if sop and sop.status == 'superseded' }}>Superseded</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">SOP Sections</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="purpose">1. Purpose</label>
+                <textarea class="form-control" id="purpose" name="purpose" rows="3" placeholder="Describe the purpose of this SOP">{{ sop.purpose if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="scope">2. Scope</label>
+                <textarea class="form-control" id="scope" name="scope" rows="3" placeholder="Define what this SOP covers">{{ sop.scope if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="responsibilities">3. Responsibilities</label>
+                <textarea class="form-control" id="responsibilities" name="responsibilities" rows="3" placeholder="List roles and responsibilities">{{ sop.responsibilities if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="definitions">4. Definitions</label>
+                <textarea class="form-control" id="definitions" name="definitions" rows="3" placeholder="Define key terms used in this SOP">{{ sop.definitions if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="procedure_text">5. Procedure</label>
+                <textarea class="form-control" id="procedure_text" name="procedure_text" rows="8" placeholder="Enter the step-by-step procedure. Use numbered steps.">{{ sop.procedure_text if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="equipment_materials">6. Equipment & Materials</label>
+                <textarea class="form-control" id="equipment_materials" name="equipment_materials" rows="3" placeholder="List required equipment and materials">{{ sop.equipment_materials if sop else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="references_text">7. References</label>
+                <textarea class="form-control" id="references_text" name="references_text" rows="3" placeholder="List related documents, regulations, or standards">{{ sop.references_text if sop else '' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Revision History
+            <span class="card-subtle">Track changes across revisions</span>
+        </div>
+        <div class="card-body">
+            <div class="param-rows" id="revRows">
+                <div class="param-row rev-row" style="margin-bottom:4px;">
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Rev #</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Date</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Description</label>
+                    <label style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--c13-text-muted);">Approved By</label>
+                    <span></span>
+                </div>
+                {% if revision_history %}
+                {% for h in revision_history %}
+                <div class="param-row rev-row">
+                    <input type="text" class="form-control" name="rev_num[]" value="{{ h.revision }}" placeholder="00">
+                    <input type="date" class="form-control" name="rev_date[]" value="{{ h.date }}">
+                    <input type="text" class="form-control" name="rev_desc[]" value="{{ h.description }}" placeholder="Description of changes">
+                    <input type="text" class="form-control" name="rev_approved[]" value="{{ h.approved_by }}" placeholder="Name">
+                    <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="param-row rev-row">
+                    <input type="text" class="form-control" name="rev_num[]" value="00" placeholder="00">
+                    <input type="date" class="form-control" name="rev_date[]">
+                    <input type="text" class="form-control" name="rev_desc[]" placeholder="Initial release">
+                    <input type="text" class="form-control" name="rev_approved[]" placeholder="Name">
+                    <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endif %}
+            </div>
+            <button type="button" class="btn-add-row" onclick="addRevRow()">+ Add Revision Entry</button>
+        </div>
+    </div>
+
+    <div class="actions-bar">
+        <button type="submit" class="btn btn-primary">{{ 'Save Changes' if sop else 'Create SOP' }}</button>
+        {% if sop %}
+        <a href="{{ url_for('sop_detail', sop_id=sop.id) }}" class="btn btn-outline">Cancel</a>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addRevRow() {
+    const rows = document.getElementById('revRows');
+    const row = document.createElement('div');
+    row.className = 'param-row rev-row';
+    row.innerHTML = `
+        <input type="text" class="form-control" name="rev_num[]" placeholder="00">
+        <input type="date" class="form-control" name="rev_date[]">
+        <input type="text" class="form-control" name="rev_desc[]" placeholder="Description of changes">
+        <input type="text" class="form-control" name="rev_approved[]" placeholder="Name">
+        <button type="button" class="btn-remove-row" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    rows.appendChild(row);
+}
+</script>
+{% endblock %}
