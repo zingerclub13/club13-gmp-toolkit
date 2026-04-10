@@ -504,11 +504,12 @@ def pk_spec_detail(spec_id):
         "SELECT * FROM pk_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
     has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "PK Specification Test Record Template.dotx"))
+    has_crr_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx"))
     attachments = db.execute(
         "SELECT a.*, u.full_name as uploader_name FROM spec_attachments a LEFT JOIN users u ON a.uploaded_by = u.id WHERE a.spec_type = 'pk' AND a.spec_id = ? ORDER BY a.created_at",
         (spec_id,),
     ).fetchall()
-    return render_template("packaging_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, attachments=attachments)
+    return render_template("packaging_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, has_crr_template=has_crr_template, attachments=attachments)
 
 
 @app.route("/packaging-specs/<int:spec_id>/delete", methods=["POST"])
@@ -544,6 +545,29 @@ def pk_spec_download(spec_id):
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
         ("pk_spec", spec_id, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+@app.route("/packaging-specs/<int:spec_id>/receiving-record")
+@login_required
+def pk_receiving_record(spec_id):
+    from doc_generator import generate_receiving_record
+    db = get_db()
+    spec = db.execute("SELECT * FROM packaging_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("pk_specs_list"))
+    template_path = os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx")
+    if not os.path.exists(template_path):
+        flash("Receiving record template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("pk_spec_detail", spec_id=spec_id))
+    output_path = generate_receiving_record(template_path, spec, "pk")
+    filename = f"PK-{spec['spec_number']}-Receiving-Record.docx"
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("pk_receiving", spec_id, "download", filename, session["user_id"]),
     )
     db.commit()
     return send_file(output_path, as_attachment=True, download_name=filename)
@@ -671,11 +695,12 @@ def rm_spec_detail(spec_id):
         "SELECT * FROM rm_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
     has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "RM Specification Test Record Template.dotx"))
+    has_crr_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx"))
     attachments = db.execute(
         "SELECT a.*, u.full_name as uploader_name FROM spec_attachments a LEFT JOIN users u ON a.uploaded_by = u.id WHERE a.spec_type = 'rm' AND a.spec_id = ? ORDER BY a.created_at",
         (spec_id,),
     ).fetchall()
-    return render_template("raw_material_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, attachments=attachments)
+    return render_template("raw_material_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, has_crr_template=has_crr_template, attachments=attachments)
 
 
 @app.route("/raw-material-specs/<int:spec_id>/delete", methods=["POST"])
@@ -716,6 +741,29 @@ def rm_spec_download(spec_id):
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
         ("rm_spec", spec_id, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+@app.route("/raw-material-specs/<int:spec_id>/receiving-record")
+@login_required
+def rm_receiving_record(spec_id):
+    from doc_generator import generate_receiving_record
+    db = get_db()
+    spec = db.execute("SELECT * FROM raw_material_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("rm_specs_list"))
+    template_path = os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx")
+    if not os.path.exists(template_path):
+        flash("Receiving record template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("rm_spec_detail", spec_id=spec_id))
+    output_path = generate_receiving_record(template_path, spec, "rm")
+    filename = f"RM-{spec['spec_number']}-Receiving-Record.docx"
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("rm_receiving", spec_id, "download", filename, session["user_id"]),
     )
     db.commit()
     return send_file(output_path, as_attachment=True, download_name=filename)
@@ -1031,6 +1079,7 @@ ALLOWED_TEMPLATE_NAMES = {
     "pk_template": "PK Specification Test Record Template.dotx",
     "rm_template": "RM Specification Test Record Template.dotx",
     "sop_template": "SOP Temp.dotx",
+    "crr_template": "CLB003 Component Receiving Record.docx",
 }
 
 

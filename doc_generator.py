@@ -442,6 +442,62 @@ def _copy_table(doc, src_table):
 
 
 # ══════════════════════════════════════════════════════════════════
+# COMPONENT RECEIVING RECORD
+# ══════════════════════════════════════════════════════════════════
+
+def generate_receiving_record(template_path, spec, spec_type):
+    """Generate a Component Receiving Record from the CLB003 template.
+
+    The template has two identical pages (duplicate form).
+    Fields filled from the spec:
+      - COMPONENT CODE NO.  → spec.material_code
+      - COMPONENT NAME      → spec.material_name
+      - VENDOR              → spec.supplier
+    All other fields (LOT NO., PO NO., DATE, etc.) are left blank for hand-fill.
+
+    spec_type: 'pk' or 'rm' (used for filename context only).
+    """
+    doc = Document(template_path)
+
+    field_map = {
+        "COMPONENT CODE NO.:": _val(spec, "material_code"),
+        "COMPONENT NAME:": _val(spec, "material_name"),
+        "VENDOR:": _val(spec, "supplier"),
+    }
+
+    for p in doc.paragraphs:
+        text = p.text
+        for label, value in field_map.items():
+            if label in text:
+                _fill_underscore_field(p, label, value)
+
+    output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    doc.save(output.name)
+    return output.name
+
+
+def _fill_underscore_field(paragraph, label, value):
+    """Replace the underscore placeholder after a label within a run's text.
+
+    The template puts multiple fields in a single run, e.g.:
+      'COMPONENT CODE NO.: __________  COMPONENT NAME: _____...'
+    This function replaces only the underscore block immediately after the
+    specified label, leaving other underscore blocks intact.
+    """
+    for run in paragraph.runs:
+        if label in run.text:
+            # Find the label position and the underscore block after it
+            idx = run.text.index(label) + len(label)
+            rest = run.text[idx:]
+            m = re.search(r"_{3,}", rest)
+            if m:
+                before = run.text[:idx + m.start()]
+                after = run.text[idx + m.end():]
+                run.text = before + (str(value) if value else "") + after
+            return
+
+
+# ══════════════════════════════════════════════════════════════════
 # SOP
 # ══════════════════════════════════════════════════════════════════
 

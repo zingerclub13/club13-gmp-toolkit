@@ -12,6 +12,9 @@
         {% else %}
         <span class="btn btn-outline" style="opacity:0.5;cursor:not-allowed;" title="Upload PK template in Settings first">⬇ Template Missing</span>
         {% endif %}
+        {% if has_crr_template %}
+        <a href="{{ url_for('pk_receiving_record', spec_id=spec.id) }}" class="btn btn-outline">⬇ Receiving Record</a>
+        {% endif %}
         <a href="{{ url_for('pk_spec_edit', spec_id=spec.id) }}" class="btn btn-outline">Edit</a>
         {% if session.get('role') in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('pk_spec_delete', spec_id=spec.id) }}" style="display:inline;" onsubmit="return confirm('Delete this specification?')">
