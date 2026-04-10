@@ -213,13 +213,15 @@ def _find_sibling_rPr(row_tr, skip_col):
 # PK / RM SPECIFICATION TEST RECORD
 # ══════════════════════════════════════════════════════════════════
 
-def generate_pk_spec_record(template_path, spec, parameters):
+def generate_pk_spec_record(template_path, spec, parameters, attachment_paths=None):
     """Generate a PK Specification Test Record with spec info filled in."""
-    return _generate_spec_record(template_path, spec, parameters)
+    return _generate_spec_record(template_path, spec, parameters,
+                                 attachment_paths=attachment_paths)
 
 
 def generate_rm_spec_record(template_path, spec, parameters,
-                            direct_params=None, coa_params=None):
+                            direct_params=None, coa_params=None,
+                            attachment_paths=None):
     """Generate an RM Specification Test Record with spec info filled in.
 
     If direct_params/coa_params are provided, they are used for the two
@@ -228,11 +230,13 @@ def generate_rm_spec_record(template_path, spec, parameters,
     return _generate_spec_record(
         template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
+        attachment_paths=attachment_paths,
     )
 
 
 def _generate_spec_record(template_path, spec, parameters,
-                          direct_params=None, coa_params=None):
+                          direct_params=None, coa_params=None,
+                          attachment_paths=None):
     """Shared logic for PK and RM spec record generation.
 
     Fills header fields (NO, Component No, Rev No, Component Name) and
@@ -304,6 +308,10 @@ def _generate_spec_record(template_path, spec, parameters,
         for table in tables:
             _fill_spec_table(table, parameters)
 
+    # ── Append 3rd-party attachments as separate pages ────────────
+    if attachment_paths:
+        _append_attachments(doc, attachment_paths)
+
     # ── Save ────────────────────────────────────────────────────
     output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     doc.save(output.name)
@@ -348,6 +356,89 @@ def _fill_spec_table(table, parameters):
         # Cols 2-3 (Results, Reference) left blank for hand-fill
         # Cols 4-5 (P, F) keep their template text for circling on paper
         tbl_elem.append(new_tr)
+
+
+# ── Attachment appender ─────────────────────────────────────────
+
+def _append_attachments(doc, attachment_paths):
+    """Append 3rd-party attachments as separate pages in the document.
+
+    attachment_paths: list of (original_name, file_path) tuples.
+
+    - Images (.png, .jpg, .jpeg) are inserted full-width on a new page.
+    - .docx files are merged paragraph-by-paragraph on a new page.
+    - .pdf / other: a reference page is added noting the attached file.
+    """
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_BREAK
+
+    for original_name, file_path in attachment_paths:
+        ext = os.path.splitext(file_path)[1].lower()
+
+        # Add page break before each attachment
+        bp = doc.add_paragraph()
+        bp.runs[0].add_break(WD_BREAK.PAGE) if bp.runs else bp.add_run().add_break(WD_BREAK.PAGE)
+
+        if ext in (".png", ".jpg", ".jpeg"):
+            # Insert image — fit to page width
+            heading = doc.add_paragraph()
+            run = heading.add_run(f"Attachment: {original_name}")
+            run.bold = True
+            run.font.size = Pt(11)
+            try:
+                doc.add_picture(file_path, width=Inches(6.5))
+            except Exception:
+                doc.add_paragraph(f"[Image could not be embedded: {original_name}]")
+
+        elif ext == ".docx":
+            # Merge .docx content paragraph-by-paragraph
+            heading = doc.add_paragraph()
+            run = heading.add_run(f"Attachment: {original_name}")
+            run.bold = True
+            run.font.size = Pt(11)
+            try:
+                att_doc = Document(file_path)
+                for p in att_doc.paragraphs:
+                    new_p = doc.add_paragraph(p.text, style=p.style.name if p.style else None)
+                    # Copy run-level formatting
+                    if p.runs and new_p.runs:
+                        for src_run, dst_run in zip(p.runs, new_p.runs):
+                            if src_run.bold is not None:
+                                dst_run.bold = src_run.bold
+                            if src_run.italic is not None:
+                                dst_run.italic = src_run.italic
+                # Copy tables from attached doc
+                for table in att_doc.tables:
+                    _copy_table(doc, table)
+            except Exception:
+                doc.add_paragraph(f"[Document could not be embedded: {original_name}]")
+
+        elif ext == ".pdf":
+            heading = doc.add_paragraph()
+            run = heading.add_run(f"Attachment: {original_name}")
+            run.bold = True
+            run.font.size = Pt(11)
+            doc.add_paragraph(
+                "This PDF attachment is included as a separate file. "
+                "Please refer to the uploaded PDF document."
+            )
+
+        else:
+            heading = doc.add_paragraph()
+            run = heading.add_run(f"Attachment: {original_name}")
+            run.bold = True
+            run.font.size = Pt(11)
+            doc.add_paragraph(f"[File type {ext} — see uploaded attachment]")
+
+
+def _copy_table(doc, src_table):
+    """Copy a table from one Document into another, preserving structure."""
+    rows = len(src_table.rows)
+    cols = len(src_table.columns)
+    new_table = doc.add_table(rows=rows, cols=cols)
+    for ri, row in enumerate(src_table.rows):
+        for ci, cell in enumerate(row.cells):
+            new_table.rows[ri].cells[ci].text = cell.text
 
 
 # ══════════════════════════════════════════════════════════════════

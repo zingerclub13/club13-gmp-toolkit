@@ -102,4 +102,49 @@
     </div>
 </div>
 {% endif %}
+
+<div class="card">
+    <div class="card-header">
+        3rd Party Attachments
+        <span class="card-subtle">COAs, vendor specifications, or supporting documents — appended as separate pages when downloaded</span>
+    </div>
+    <div class="card-body">
+        {% if attachments %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Type</th>
+                        <th>Uploaded By</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for att in attachments %}
+                    <tr>
+                        <td><a href="{{ url_for('attachment_view', att_id=att.id) }}">{{ att.original_name }}</a></td>
+                        <td>{{ att.file_type|upper }}</td>
+                        <td>{{ att.uploader_name or '—' }}</td>
+                        <td>{{ att.created_at[:16] if att.created_at else '—' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('attachment_delete', att_id=att.id) }}" style="display:inline;" onsubmit="return confirm('Delete this attachment?')">
+                                <button type="submit" class="btn btn-danger btn-sm">×</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="color:var(--c13-text-muted);font-size:0.9rem;">No attachments yet.</p>
+        {% endif %}
+        <form method="POST" action="{{ url_for('attachment_upload', spec_type='rm', spec_id=spec.id) }}" enctype="multipart/form-data" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.docx,.doc" required>
+            <button type="submit" class="btn btn-outline btn-sm">Upload</button>
+        </form>
+    </div>
+</div>
 {% endblock %}

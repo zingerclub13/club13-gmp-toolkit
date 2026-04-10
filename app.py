@@ -28,11 +28,32 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 if os.path.exists("/data"):
     DATABASE = "/data/club13_gmp.db"
     TEMPLATE_DIR = "/data/doc_templates"
+    ATTACHMENTS_DIR = "/data/attachments"
 else:
     DATABASE = os.path.join(os.path.dirname(__file__), "club13_gmp.db")
     TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "doc_templates")
+    ATTACHMENTS_DIR = os.path.join(os.path.dirname(__file__), "attachments")
 
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
+os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+
+ALLOWED_ATTACHMENT_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".docx", ".doc"}
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+def _get_attachment_paths(spec_type, spec_id):
+    """Return list of (original_name, full_path) for a spec's attachments."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT filename, original_name FROM spec_attachments WHERE spec_type = ? AND spec_id = ? ORDER BY created_at",
+        (spec_type, spec_id),
+    ).fetchall()
+    paths = []
+    for r in rows:
+        fp = os.path.join(ATTACHMENTS_DIR, r["filename"])
+        if os.path.exists(fp):
+            paths.append((r["original_name"], fp))
+    return paths
 
 
 # ── Database helpers ────────────────────────────────────────────────
@@ -216,6 +237,20 @@ def init_db():
             approved_by TEXT,
             FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE
         );
+
+        -- Spec attachments (3rd party COAs, vendor specs)
+        CREATE TABLE IF NOT EXISTS spec_attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            spec_type TEXT NOT NULL,
+            spec_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            uploaded_by INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (uploaded_by) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_attachments_spec ON spec_attachments(spec_type, spec_id);
 
         -- Document generation log
         CREATE TABLE IF NOT EXISTS document_log (
@@ -469,7 +504,11 @@ def pk_spec_detail(spec_id):
         "SELECT * FROM pk_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
     has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "PK Specification Test Record Template.dotx"))
-    return render_template("packaging_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template)
+    attachments = db.execute(
+        "SELECT a.*, u.full_name as uploader_name FROM spec_attachments a LEFT JOIN users u ON a.uploaded_by = u.id WHERE a.spec_type = 'pk' AND a.spec_id = ? ORDER BY a.created_at",
+        (spec_id,),
+    ).fetchall()
+    return render_template("packaging_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, attachments=attachments)
 
 
 @app.route("/packaging-specs/<int:spec_id>/delete", methods=["POST"])
@@ -499,7 +538,8 @@ def pk_spec_download(spec_id):
     if not os.path.exists(template_path):
         flash("PK template not uploaded. Go to Settings > Templates.", "danger")
         return redirect(url_for("pk_spec_detail", spec_id=spec_id))
-    output_path = generate_pk_spec_record(template_path, spec, parameters)
+    output_path = generate_pk_spec_record(template_path, spec, parameters,
+                                           attachment_paths=_get_attachment_paths("pk", spec_id))
     filename = f"PK-{spec['spec_number']}-Test-Record.docx"
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
@@ -631,7 +671,11 @@ def rm_spec_detail(spec_id):
         "SELECT * FROM rm_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
     has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "RM Specification Test Record Template.dotx"))
-    return render_template("raw_material_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template)
+    attachments = db.execute(
+        "SELECT a.*, u.full_name as uploader_name FROM spec_attachments a LEFT JOIN users u ON a.uploaded_by = u.id WHERE a.spec_type = 'rm' AND a.spec_id = ? ORDER BY a.created_at",
+        (spec_id,),
+    ).fetchall()
+    return render_template("raw_material_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, attachments=attachments)
 
 
 @app.route("/raw-material-specs/<int:spec_id>/delete", methods=["POST"])
@@ -666,6 +710,7 @@ def rm_spec_download(spec_id):
     output_path = generate_rm_spec_record(
         template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
+        attachment_paths=_get_attachment_paths("rm", spec_id),
     )
     filename = f"RM-{spec['spec_number']}-Test-Record.docx"
     db.execute(
@@ -1026,6 +1071,92 @@ def template_upload():
     file.save(os.path.join(TEMPLATE_DIR, target_name))
     flash(f"Template '{target_name}' uploaded successfully.", "success")
     return redirect(url_for("template_settings"))
+
+
+# ══════════════════════════════════════════════════════════════════
+# SPEC ATTACHMENTS (3rd party COAs / Vendor Specifications)
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/attachments/<spec_type>/<int:spec_id>/upload", methods=["POST"])
+@login_required
+def attachment_upload(spec_type, spec_id):
+    if spec_type not in ("pk", "rm"):
+        flash("Invalid spec type.", "danger")
+        return redirect(url_for("dashboard"))
+
+    detail_url = url_for("pk_spec_detail" if spec_type == "pk" else "rm_spec_detail", spec_id=spec_id)
+
+    file = request.files.get("attachment")
+    if not file or file.filename == "":
+        flash("No file selected.", "danger")
+        return redirect(detail_url)
+
+    original_name = secure_filename(file.filename)
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in ALLOWED_ATTACHMENT_EXT:
+        flash(f"File type {ext} not allowed. Allowed: {', '.join(sorted(ALLOWED_ATTACHMENT_EXT))}", "danger")
+        return redirect(detail_url)
+
+    # Read and check size
+    file_data = file.read()
+    if len(file_data) > MAX_ATTACHMENT_SIZE:
+        flash("File too large. Maximum 10 MB.", "danger")
+        return redirect(detail_url)
+
+    # Save with unique name
+    unique_name = f"{spec_type}_{spec_id}_{secrets.token_hex(8)}{ext}"
+    save_path = os.path.join(ATTACHMENTS_DIR, unique_name)
+    with open(save_path, "wb") as f:
+        f.write(file_data)
+
+    db = get_db()
+    db.execute(
+        "INSERT INTO spec_attachments (spec_type, spec_id, filename, original_name, file_type, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)",
+        (spec_type, spec_id, unique_name, original_name, ext, session["user_id"]),
+    )
+    db.commit()
+    flash(f"Attachment '{original_name}' uploaded.", "success")
+    return redirect(detail_url)
+
+
+@app.route("/attachments/<int:att_id>/delete", methods=["POST"])
+@login_required
+def attachment_delete(att_id):
+    db = get_db()
+    att = db.execute("SELECT * FROM spec_attachments WHERE id = ?", (att_id,)).fetchone()
+    if not att:
+        flash("Attachment not found.", "danger")
+        return redirect(url_for("dashboard"))
+
+    detail_url = url_for(
+        "pk_spec_detail" if att["spec_type"] == "pk" else "rm_spec_detail",
+        spec_id=att["spec_id"],
+    )
+
+    # Remove file
+    file_path = os.path.join(ATTACHMENTS_DIR, att["filename"])
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    db.execute("DELETE FROM spec_attachments WHERE id = ?", (att_id,))
+    db.commit()
+    flash("Attachment deleted.", "success")
+    return redirect(detail_url)
+
+
+@app.route("/attachments/<int:att_id>/view")
+@login_required
+def attachment_view(att_id):
+    db = get_db()
+    att = db.execute("SELECT * FROM spec_attachments WHERE id = ?", (att_id,)).fetchone()
+    if not att:
+        flash("Attachment not found.", "danger")
+        return redirect(url_for("dashboard"))
+    file_path = os.path.join(ATTACHMENTS_DIR, att["filename"])
+    if not os.path.exists(file_path):
+        flash("File not found on disk.", "danger")
+        return redirect(url_for("dashboard"))
+    return send_file(file_path, download_name=att["original_name"])
 
 
 # ══════════════════════════════════════════════════════════════════
