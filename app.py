@@ -37,6 +37,16 @@ else:
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
 
+# Auto-seed bundled templates into the persistent data directory
+BUNDLED_TEMPLATES = os.path.join(os.path.dirname(__file__), "doc_templates")
+if os.path.isdir(BUNDLED_TEMPLATES) and BUNDLED_TEMPLATES != TEMPLATE_DIR:
+    import shutil
+    for fname in os.listdir(BUNDLED_TEMPLATES):
+        src = os.path.join(BUNDLED_TEMPLATES, fname)
+        dst = os.path.join(TEMPLATE_DIR, fname)
+        if os.path.isfile(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
+
 ALLOWED_ATTACHMENT_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".docx", ".doc"}
 MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10 MB
 
@@ -1069,6 +1079,24 @@ def _save_user(user_id):
         flash("User updated.", "success")
     db.commit()
     return redirect(url_for("users_list"))
+
+
+# ══════════════════════════════════════════════════════════════════
+# RECEIVING RECORDS
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/receiving-records")
+@login_required
+def receiving_records():
+    db = get_db()
+    pk_specs = db.execute(
+        "SELECT id, spec_number, material_name, material_code, supplier FROM packaging_specs ORDER BY spec_number"
+    ).fetchall()
+    rm_specs = db.execute(
+        "SELECT id, spec_number, material_name, material_code, supplier FROM raw_material_specs ORDER BY spec_number"
+    ).fetchall()
+    has_crr_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx"))
+    return render_template("receiving_records.html", pk_specs=pk_specs, rm_specs=rm_specs, has_crr_template=has_crr_template)
 
 
 # ══════════════════════════════════════════════════════════════════

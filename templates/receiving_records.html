@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title_extra %} — Receiving Records{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Component Receiving Records</h1>
+        <p>Generate pre-filled CLB003 receiving records for any specification</p>
+    </div>
+</div>
+
+{% if not has_crr_template %}
+<div class="alert alert-danger">
+    The receiving record template (CLB003) has not been uploaded. Go to <a href="{{ url_for('template_settings') }}">Settings → Templates</a> to upload it.
+</div>
+{% endif %}
+
+{% if pk_specs %}
+<div class="card">
+    <div class="card-header">Packaging Specifications</div>
+    <div class="card-body">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Spec Number</th>
+                        <th>Material Name</th>
+                        <th>Material Code</th>
+                        <th>Supplier</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for spec in pk_specs %}
+                    <tr>
+                        <td><a href="{{ url_for('pk_spec_detail', spec_id=spec.id) }}"><strong>{{ spec.spec_number }}</strong></a></td>
+                        <td>{{ spec.material_name }}</td>
+                        <td>{{ spec.material_code or '—' }}</td>
+                        <td>{{ spec.supplier or '—' }}</td>
+                        <td>
+                            {% if has_crr_template %}
+                            <a href="{{ url_for('pk_receiving_record', spec_id=spec.id) }}" class="btn btn-primary btn-sm">⬇ Receiving Record</a>
+                            {% else %}
+                            <span class="btn btn-outline btn-sm" style="opacity:0.5;cursor:not-allowed;">Template Missing</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if rm_specs %}
+<div class="card">
+    <div class="card-header">Raw Material Specifications</div>
+    <div class="card-body">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Spec Number</th>
+                        <th>Material Name</th>
+                        <th>Material Code</th>
+                        <th>Supplier</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for spec in rm_specs %}
+                    <tr>
+                        <td><a href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}"><strong>{{ spec.spec_number }}</strong></a></td>
+                        <td>{{ spec.material_name }}</td>
+                        <td>{{ spec.material_code or '—' }}</td>
+                        <td>{{ spec.supplier or '—' }}</td>
+                        <td>
+                            {% if has_crr_template %}
+                            <a href="{{ url_for('rm_receiving_record', spec_id=spec.id) }}" class="btn btn-primary btn-sm">⬇ Receiving Record</a>
+                            {% else %}
+                            <span class="btn btn-outline btn-sm" style="opacity:0.5;cursor:not-allowed;">Template Missing</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not pk_specs and not rm_specs %}
+<div class="card">
+    <div class="card-body">
+        <p style="color:var(--c13-text-muted);text-align:center;padding:32px 0;">
+            No specifications created yet. Create a <a href="{{ url_for('pk_spec_new') }}">Packaging Spec</a> or <a href="{{ url_for('rm_spec_new') }}">Raw Material Spec</a> first.
+        </p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
