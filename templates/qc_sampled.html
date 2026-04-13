@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title_extra %} — QC Sampled Stickers{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>QC Sampled Stickers</h1>
+        <p>Generate printable CLB009 QC Lab Sampled stickers — 30 per page</p>
+    </div>
+</div>
+
+{% if not has_template %}
+<div class="alert alert-danger">
+    The QC Sampled template (CLB009) has not been uploaded. Go to <a href="{{ url_for('template_settings') }}">Settings → Templates</a> to upload it.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">Sticker Details</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('qc_sampled_generate') }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label>Number of Stickers *</label>
+                    <input type="number" class="form-control" name="sticker_count" min="1" max="999" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" class="form-control" name="date" placeholder="e.g. 04/11/2026">
+                </div>
+                <div class="form-group">
+                    <label>By</label>
+                    <input type="text" class="form-control" name="by" placeholder="Initials">
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                {% if has_template %}
+                <button type="submit" class="btn btn-primary">⬇ Generate Stickers</button>
+                {% else %}
+                <span class="btn btn-outline" style="opacity:0.5;cursor:not-allowed;">Template Missing</span>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">How It Works</div>
+    <div class="card-body">
+        <p style="color:var(--c13-text-muted);line-height:1.6;">
+            Enter the quantity and optional Date/By. The system generates a printable Word document
+            with <strong>30 stickers per page</strong> (10 rows × 3 columns). Each sticker displays
+            "QC LAB SAMPLED" with the Date and By fields filled in.
+        </p>
+        <p style="color:var(--c13-text-muted);line-height:1.6;margin-top:8px;">
+            Fields left blank will remain as underscores on the printed sticker for hand-fill.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -60,6 +60,18 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>
                     Receiving Records
                 </a>
+                <a href="{{ url_for('tags_page') }}" class="nav-link {% if request.endpoint in ('tags_page', 'tags_generate') %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    ID Tags
+                </a>
+                <a href="{{ url_for('qc_release_page') }}" class="nav-link {% if request.endpoint in ('qc_release_page', 'qc_release_generate') %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    QC Release
+                </a>
+                <a href="{{ url_for('qc_sampled_page') }}" class="nav-link {% if request.endpoint in ('qc_sampled_page', 'qc_sampled_generate') %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+                    QC Sampled
+                </a>
 
                 {% if session.get('role') in ('admin', 'manager') %}
                 <div class="nav-section">Settings</div>

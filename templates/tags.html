@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title_extra %} — Component ID Tags{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Component ID Tags</h1>
+        <p>Generate printable CLB010 ID tags — 6 per page, auto-numbered by container</p>
+    </div>
+</div>
+
+{% if not has_tag_template %}
+<div class="alert alert-danger">
+    The ID tag template (CLB010) has not been uploaded. Go to <a href="{{ url_for('template_settings') }}">Settings → Templates</a> to upload it.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">Tag Details</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('tags_generate') }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label>Component #</label>
+                    <input type="text" class="form-control" name="component_code" placeholder="e.g. RM-001">
+                </div>
+                <div class="form-group">
+                    <label>Lot #</label>
+                    <input type="text" class="form-control" name="lot_number" placeholder="e.g. 2026-0411">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Component Name</label>
+                <input type="text" class="form-control" name="component_name" placeholder="e.g. Kratom Powder">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label>Number of Containers *</label>
+                    <input type="number" class="form-control" name="container_count" min="1" max="999" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" class="form-control" name="date" placeholder="e.g. 04/11/2026">
+                </div>
+                <div class="form-group">
+                    <label>By</label>
+                    <input type="text" class="form-control" name="by" placeholder="Initials">
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                {% if has_tag_template %}
+                <button type="submit" class="btn btn-primary">⬇ Generate Tags</button>
+                {% else %}
+                <span class="btn btn-outline" style="opacity:0.5;cursor:not-allowed;">Template Missing</span>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">How It Works</div>
+    <div class="card-body">
+        <p style="color:var(--c13-text-muted);line-height:1.6;">
+            Enter the component details and the number of containers. The system generates a
+            printable Word document with <strong>6 tags per page</strong>, each automatically
+            numbered (Ctn 1 of 5, Ctn 2 of 5, etc.). Print on your label sheet stock for
+            ready-to-apply component identification tags.
+        </p>
+        <p style="color:var(--c13-text-muted);line-height:1.6;margin-top:8px;">
+            Fields left blank will remain as underscores on the printed tag for hand-fill.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -9,8 +9,13 @@ Templates:
   - PK Specification Test Record Template.dotx
   - RM Specification Test Record Template.dotx
   - SOP Temp.dotx
+  - CLB003 Component Receiving Record.docx
+  - CLB008 QC Release Sticker.docx
+  - CLB009 QC Sampled.docx
+  - CLB010 Component ID Tag.docx
 """
 import io
+import math
 import os
 import re
 import tempfile
@@ -585,3 +590,303 @@ def _insert_paragraphs_after(ref_para, content):
         new_p.append(r_elem)
 
         ref_para._element.addnext(new_p)
+
+
+# ══════════════════════════════════════════════════════════════════
+# COMPONENT ID TAG (CLB010)
+# ══════════════════════════════════════════════════════════════════
+
+# The CLB010 template is a 3×3 table (cols 0 & 2 are tag cells, col 1 is
+# a spacer).  That gives 6 tags per page.  Each tag cell contains paragraphs
+# with underscore placeholders for:
+#   P4: Component# ________ Lot# ____________
+#   P6: Component Name:____________________
+#   P7:       ____________________________________ (name overflow)
+#   P8: Ctn# _____of ______Date: ______By____
+
+TAGS_PER_PAGE = 6
+_TAG_CELL_ORDER = [(0, 0), (0, 2), (1, 0), (1, 2), (2, 0), (2, 2)]
+
+
+def generate_id_tags(template_path, form_data, container_count):
+    """Generate Component ID Tags from the CLB010 template.
+
+    form_data dict keys:
+        component_code, component_name, lot_number, date, by
+    container_count: int — number of tags to produce (each gets Ctn# X of Y).
+
+    Returns path to a temporary .docx file.
+    """
+    import math
+
+    doc = Document(template_path)
+    table = doc.tables[0]
+
+    pages_needed = math.ceil(container_count / TAGS_PER_PAGE)
+
+    # Save a pristine copy of the table XML before we touch anything
+    template_tbl_xml = deepcopy(table._tbl)
+
+    # Fill the first page (the existing table)
+    _fill_tag_page(table, form_data, start_ctn=1,
+                   container_count=container_count)
+
+    # Add additional pages if needed
+    for page_idx in range(1, pages_needed):
+        # Page break paragraph
+        bp = doc.add_paragraph()
+        run = bp.add_run()
+        from docx.enum.text import WD_BREAK
+        run.add_break(WD_BREAK.PAGE)
+
+        # Clone the pristine table
+        new_tbl = deepcopy(template_tbl_xml)
+        doc.element.body.append(new_tbl)
+
+        # python-docx doesn't automatically track appended XML tables,
+        # so we wrap it manually to fill it
+        from docx.table import Table
+        new_table = Table(new_tbl, doc)
+
+        start_ctn = page_idx * TAGS_PER_PAGE + 1
+        _fill_tag_page(new_table, form_data, start_ctn=start_ctn,
+                       container_count=container_count)
+
+    output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    doc.save(output.name)
+    return output.name
+
+
+def _fill_tag_page(table, form_data, start_ctn, container_count):
+    """Fill up to 6 tag cells on one page of the table."""
+    component_code = form_data.get("component_code", "")
+    component_name = form_data.get("component_name", "")
+    lot_number = form_data.get("lot_number", "")
+    date_val = form_data.get("date", "")
+    by_val = form_data.get("by", "")
+
+    for slot_idx, (ri, ci) in enumerate(_TAG_CELL_ORDER):
+        ctn_num = start_ctn + slot_idx
+        if ctn_num > container_count:
+            break  # Leave remaining cells as blank templates
+
+        cell = table.rows[ri].cells[ci]
+        _fill_tag_cell(cell, component_code, component_name, lot_number,
+                       ctn_num, container_count, date_val, by_val)
+
+
+def _fill_tag_cell(cell, component_code, component_name, lot_number,
+                   ctn_num, ctn_total, date_val, by_val):
+    """Fill a single tag cell by replacing underscore placeholders."""
+    for p in cell.paragraphs:
+        text = p.text
+
+        if "Component#" in text and "Lot#" in text:
+            # P4: Component# ________ Lot# ____________
+            # Replace the 2 underscore blocks in order: component_code, lot_number
+            _replace_underscores_sequential(p, [component_code, lot_number])
+
+        elif "Component Name:" in text:
+            # P6: Component Name:____________________
+            for run in p.runs:
+                if "___" in run.text:
+                    run.text = re.sub(r"_{3,}", component_name, run.text, count=1)
+                    break
+
+        elif text.strip().startswith("_") and re.search(r"_{10,}", text):
+            # P7: continuation underscores — clear them
+            for run in p.runs:
+                if "_" in run.text:
+                    run.text = re.sub(r"_+", "", run.text)
+
+        elif "Ctn#" in text:
+            # P8: Ctn# _____of ______Date: ______By____
+            # Replace 4 underscore blocks in order:
+            #   1) ctn_num  2) ctn_total  3) date  4) by
+            # Pad values with trailing space to preserve readability
+            replacements = [
+                f"{ctn_num} " if ctn_num else "",
+                f"{ctn_total} " if ctn_total else "",
+                f"{date_val} " if date_val else "",
+                f" {by_val}" if by_val else "",
+            ]
+            _replace_underscores_sequential(p, replacements)
+
+
+def _replace_underscore_after(paragraph, needle, value, occurrence=1):
+    """Replace the Nth underscore block that follows `needle` across runs.
+
+    Because run boundaries vary between cells, we work at the full run
+    level — scanning each run for `needle` followed by underscores.
+    """
+    count = 0
+    for run in paragraph.runs:
+        # Find all underscore blocks in this run preceded by the needle
+        start = 0
+        while True:
+            idx = run.text.find(needle, start)
+            if idx == -1:
+                break
+            after = idx + len(needle)
+            m = re.search(r"_{3,}", run.text[after:])
+            if m:
+                count += 1
+                if count == occurrence:
+                    before = run.text[:after + m.start()]
+                    rest = run.text[after + m.end():]
+                    run.text = before + (str(value) if value else "") + rest
+                    return
+                start = after + m.end()
+            else:
+                start = after
+
+    # Fallback: just replace the Nth underscore block overall
+    count = 0
+    for run in paragraph.runs:
+        for m in re.finditer(r"_{3,}", run.text):
+            count += 1
+            if count == occurrence:
+                run.text = run.text[:m.start()] + (str(value) if value else "") + run.text[m.end():]
+                return
+
+
+def _replace_underscores_sequential(paragraph, replacements):
+    """Replace underscore blocks across all runs in order, one per replacement."""
+    rep_idx = 0
+    for run in paragraph.runs:
+        while rep_idx < len(replacements):
+            m = re.search(r"_{3,}", run.text)
+            if not m:
+                break
+            val = replacements[rep_idx] if replacements[rep_idx] else ""
+            run.text = run.text[:m.start()] + str(val) + run.text[m.end():]
+            rep_idx += 1
+
+
+# ═══════════════════════════════════════════════════════════════════
+# CLB008 – QC Release Stickers (30 per page)
+# ═══════════════════════════════════════════════════════════════════
+
+STICKERS_PER_PAGE = 30
+_STICKER_CELL_ORDER = [(r, c) for r in range(10) for c in (0, 2, 4)]
+
+
+def generate_qc_release_stickers(template_path, form_data, sticker_count):
+    """Generate CLB008 QC Release Stickers — 30 per page."""
+    doc = Document(template_path)
+    first_table = doc.tables[0]
+    template_tbl_xml = deepcopy(first_table._tbl)
+
+    # Fill the first page (already in the doc)
+    _fill_release_page(first_table, form_data, start=1, total=sticker_count)
+
+    # Additional pages as needed
+    total_pages = math.ceil(sticker_count / STICKERS_PER_PAGE)
+    for page_idx in range(1, total_pages):
+        doc.add_page_break()
+        new_tbl = deepcopy(template_tbl_xml)
+        doc.element.body.append(new_tbl)
+        from docx.table import Table
+        new_table = Table(new_tbl, doc)
+        _fill_release_page(new_table, form_data,
+                           start=page_idx * STICKERS_PER_PAGE + 1,
+                           total=sticker_count)
+
+    output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    doc.save(output.name)
+    return output.name
+
+
+def _fill_release_page(table, form_data, start, total):
+    """Fill up to 30 QC Release sticker cells on one page."""
+    item_val = form_data.get("item_number", "")
+    lot_val = form_data.get("lot_number", "")
+    date_val = form_data.get("date", "")
+    by_val = form_data.get("by", "")
+
+    for slot_idx, (ri, ci) in enumerate(_STICKER_CELL_ORDER):
+        sticker_num = start + slot_idx
+        if sticker_num > total:
+            break
+        cell = table.rows[ri].cells[ci]
+        _fill_release_cell(cell, item_val, lot_val, date_val, by_val)
+
+
+def _fill_release_cell(cell, item_val, lot_val, date_val, by_val):
+    """Fill a single CLB008 QC Release sticker cell.
+
+    Layout: P0="QC LAB RELEASE", P2="Item#: ___ Lot: ___", P4="Date: ___ By: ___"
+    """
+    for p in cell.paragraphs:
+        text = p.text
+        if "Item#" in text and "Lot" in text:
+            _replace_underscores_sequential(p, [item_val, lot_val])
+            _clear_orphan_underscores(p)
+        elif "Date" in text and "By" in text:
+            _replace_underscores_sequential(p, [
+                f"{date_val} " if date_val else "",
+                f" {by_val}" if by_val else "",
+            ])
+            _clear_orphan_underscores(p)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# CLB009 – QC Sampled Stickers (30 per page)
+# ═══════════════════════════════════════════════════════════════════
+
+def generate_qc_sampled_stickers(template_path, form_data, sticker_count):
+    """Generate CLB009 QC Sampled Stickers — 30 per page."""
+    doc = Document(template_path)
+    first_table = doc.tables[0]
+    template_tbl_xml = deepcopy(first_table._tbl)
+
+    _fill_sampled_page(first_table, form_data, start=1, total=sticker_count)
+
+    total_pages = math.ceil(sticker_count / STICKERS_PER_PAGE)
+    for page_idx in range(1, total_pages):
+        doc.add_page_break()
+        new_tbl = deepcopy(template_tbl_xml)
+        doc.element.body.append(new_tbl)
+        from docx.table import Table
+        new_table = Table(new_tbl, doc)
+        _fill_sampled_page(new_table, form_data,
+                           start=page_idx * STICKERS_PER_PAGE + 1,
+                           total=sticker_count)
+
+    output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    doc.save(output.name)
+    return output.name
+
+
+def _fill_sampled_page(table, form_data, start, total):
+    """Fill up to 30 QC Sampled sticker cells on one page."""
+    date_val = form_data.get("date", "")
+    by_val = form_data.get("by", "")
+
+    for slot_idx, (ri, ci) in enumerate(_STICKER_CELL_ORDER):
+        sticker_num = start + slot_idx
+        if sticker_num > total:
+            break
+        cell = table.rows[ri].cells[ci]
+        _fill_sampled_cell(cell, date_val, by_val)
+
+
+def _fill_sampled_cell(cell, date_val, by_val):
+    """Fill a single CLB009 QC Sampled sticker cell.
+
+    Layout: P0="QC LAB", P1="SAMPLED", P3="Date______By: ________"
+    """
+    for p in cell.paragraphs:
+        text = p.text
+        if "Date" in text and "By" in text:
+            _replace_underscores_sequential(p, [
+                f" {date_val} " if date_val else "",
+                f" {by_val}" if by_val else "",
+            ])
+            _clear_orphan_underscores(p)
+
+
+def _clear_orphan_underscores(paragraph):
+    """Remove leftover underscore blocks from split-run boundaries."""
+    for run in paragraph.runs:
+        run.text = re.sub(r"_{3,}", "", run.text)

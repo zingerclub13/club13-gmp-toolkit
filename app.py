@@ -1100,6 +1100,146 @@ def receiving_records():
 
 
 # ══════════════════════════════════════════════════════════════════
+# COMPONENT ID TAGS (CLB010)
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/tags")
+@login_required
+def tags_page():
+    has_tag_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB010 Component ID Tag.docx"))
+    return render_template("tags.html", has_tag_template=has_tag_template)
+
+
+@app.route("/tags/generate", methods=["POST"])
+@login_required
+def tags_generate():
+    from doc_generator import generate_id_tags
+
+    template_path = os.path.join(TEMPLATE_DIR, "CLB010 Component ID Tag.docx")
+    if not os.path.exists(template_path):
+        flash("ID Tag template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("tags_page"))
+
+    try:
+        container_count = int(request.form.get("container_count", 0))
+    except (ValueError, TypeError):
+        container_count = 0
+    if container_count < 1 or container_count > 999:
+        flash("Number of containers must be between 1 and 999.", "danger")
+        return redirect(url_for("tags_page"))
+
+    form_data = {
+        "component_code": request.form.get("component_code", "").strip(),
+        "component_name": request.form.get("component_name", "").strip(),
+        "lot_number": request.form.get("lot_number", "").strip(),
+        "date": request.form.get("date", "").strip(),
+        "by": request.form.get("by", "").strip(),
+    }
+
+    output_path = generate_id_tags(template_path, form_data, container_count)
+    filename = f"ID-Tags-{form_data['component_code'] or 'batch'}-x{container_count}.docx"
+    db = get_db()
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("id_tag", 0, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+# ══════════════════════════════════════════════════════════════════
+# QC RELEASE STICKERS (CLB008)
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/stickers/qc-release")
+@login_required
+def qc_release_page():
+    has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB008 QC Release Sticker.docx"))
+    return render_template("qc_release.html", has_template=has_template)
+
+
+@app.route("/stickers/qc-release/generate", methods=["POST"])
+@login_required
+def qc_release_generate():
+    from doc_generator import generate_qc_release_stickers
+
+    template_path = os.path.join(TEMPLATE_DIR, "CLB008 QC Release Sticker.docx")
+    if not os.path.exists(template_path):
+        flash("QC Release Sticker template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("qc_release_page"))
+
+    try:
+        sticker_count = int(request.form.get("sticker_count", 0))
+    except (ValueError, TypeError):
+        sticker_count = 0
+    if sticker_count < 1 or sticker_count > 999:
+        flash("Number of stickers must be between 1 and 999.", "danger")
+        return redirect(url_for("qc_release_page"))
+
+    form_data = {
+        "item_number": request.form.get("item_number", "").strip(),
+        "lot_number": request.form.get("lot_number", "").strip(),
+        "date": request.form.get("date", "").strip(),
+        "by": request.form.get("by", "").strip(),
+    }
+
+    output_path = generate_qc_release_stickers(template_path, form_data, sticker_count)
+    filename = f"QC-Release-{form_data['item_number'] or 'batch'}-x{sticker_count}.docx"
+    db = get_db()
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("qc_release", 0, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+# ══════════════════════════════════════════════════════════════════
+# QC SAMPLED STICKERS (CLB009)
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/stickers/qc-sampled")
+@login_required
+def qc_sampled_page():
+    has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "CLB009 QC Sampled.docx"))
+    return render_template("qc_sampled.html", has_template=has_template)
+
+
+@app.route("/stickers/qc-sampled/generate", methods=["POST"])
+@login_required
+def qc_sampled_generate():
+    from doc_generator import generate_qc_sampled_stickers
+
+    template_path = os.path.join(TEMPLATE_DIR, "CLB009 QC Sampled.docx")
+    if not os.path.exists(template_path):
+        flash("QC Sampled template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("qc_sampled_page"))
+
+    try:
+        sticker_count = int(request.form.get("sticker_count", 0))
+    except (ValueError, TypeError):
+        sticker_count = 0
+    if sticker_count < 1 or sticker_count > 999:
+        flash("Number of stickers must be between 1 and 999.", "danger")
+        return redirect(url_for("qc_sampled_page"))
+
+    form_data = {
+        "date": request.form.get("date", "").strip(),
+        "by": request.form.get("by", "").strip(),
+    }
+
+    output_path = generate_qc_sampled_stickers(template_path, form_data, sticker_count)
+    filename = f"QC-Sampled-x{sticker_count}.docx"
+    db = get_db()
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("qc_sampled", 0, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+# ══════════════════════════════════════════════════════════════════
 # TEMPLATE MANAGEMENT
 # ══════════════════════════════════════════════════════════════════
 
@@ -1108,6 +1248,9 @@ ALLOWED_TEMPLATE_NAMES = {
     "rm_template": "RM Specification Test Record Template.dotx",
     "sop_template": "SOP Temp.dotx",
     "crr_template": "CLB003 Component Receiving Record.docx",
+    "qc_release_template": "CLB008 QC Release Sticker.docx",
+    "qc_sampled_template": "CLB009 QC Sampled.docx",
+    "id_tag_template": "CLB010 Component ID Tag.docx",
 }
 
 
