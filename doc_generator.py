@@ -688,16 +688,18 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
 
         elif "Component Name:" in text:
             # P6: Component Name:____________________
-            for run in p.runs:
-                if "___" in run.text:
-                    run.text = re.sub(r"_{3,}", component_name, run.text, count=1)
-                    break
+            if component_name:
+                for run in p.runs:
+                    if "___" in run.text:
+                        run.text = re.sub(r"_{3,}", component_name, run.text, count=1)
+                        break
 
         elif text.strip().startswith("_") and re.search(r"_{10,}", text):
-            # P7: continuation underscores — clear them
-            for run in p.runs:
-                if "_" in run.text:
-                    run.text = re.sub(r"_+", "", run.text)
+            # P7: continuation underscores — clear only if name was provided
+            if component_name:
+                for run in p.runs:
+                    if "_" in run.text:
+                        run.text = re.sub(r"_+", "", run.text)
 
         elif "Ctn#" in text:
             # P8: Ctn# _____of ______Date: ______By____
@@ -732,9 +734,11 @@ def _replace_underscore_after(paragraph, needle, value, occurrence=1):
             if m:
                 count += 1
                 if count == occurrence:
+                    if not value:
+                        return  # Leave underscores intact
                     before = run.text[:after + m.start()]
                     rest = run.text[after + m.end():]
-                    run.text = before + (str(value) if value else "") + rest
+                    run.text = before + str(value) + rest
                     return
                 start = after + m.end()
             else:
@@ -746,21 +750,51 @@ def _replace_underscore_after(paragraph, needle, value, occurrence=1):
         for m in re.finditer(r"_{3,}", run.text):
             count += 1
             if count == occurrence:
-                run.text = run.text[:m.start()] + (str(value) if value else "") + run.text[m.end():]
+                if not value:
+                    return  # Leave underscores intact
+                run.text = run.text[:m.start()] + str(value) + run.text[m.end():]
                 return
 
 
 def _replace_underscores_sequential(paragraph, replacements):
-    """Replace underscore blocks across all runs in order, one per replacement."""
+    """Replace underscore blocks across all runs in order, one per replacement.
+
+    Empty/blank values leave the underscore block intact so the visual
+    underline is preserved for hand-writing.
+    """
     rep_idx = 0
-    for run in paragraph.runs:
+    runs = paragraph.runs
+    run_idx = 0
+    while run_idx < len(runs) and rep_idx < len(replacements):
+        run = runs[run_idx]
+        offset = 0
         while rep_idx < len(replacements):
-            m = re.search(r"_{3,}", run.text)
+            m = re.search(r"_{3,}", run.text[offset:])
             if not m:
                 break
-            val = replacements[rep_idx] if replacements[rep_idx] else ""
-            run.text = run.text[:m.start()] + str(val) + run.text[m.end():]
+            val = replacements[rep_idx]
             rep_idx += 1
+            if not val:
+                # Empty value — leave underscores intact, skip to next block
+                offset = offset + m.end()
+                continue
+            # Replace this underscore block
+            abs_start = offset + m.start()
+            abs_end = offset + m.end()
+            original_len = len(run.text)
+            block_at_end = (abs_end >= original_len)
+            run.text = run.text[:abs_start] + str(val) + run.text[abs_end:]
+            offset = abs_start + len(str(val))
+            # Clear orphan underscores from subsequent runs
+            # (handles cases where a single block was split across runs)
+            if block_at_end:
+                for fi in range(run_idx + 1, len(runs)):
+                    orphan_m = re.match(r"^_+", runs[fi].text)
+                    if orphan_m:
+                        runs[fi].text = runs[fi].text[orphan_m.end():]
+                    else:
+                        break
+        run_idx += 1
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -821,13 +855,11 @@ def _fill_release_cell(cell, item_val, lot_val, date_val, by_val):
         text = p.text
         if "Item#" in text and "Lot" in text:
             _replace_underscores_sequential(p, [item_val, lot_val])
-            _clear_orphan_underscores(p)
         elif "Date" in text and "By" in text:
             _replace_underscores_sequential(p, [
                 f"{date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
-            _clear_orphan_underscores(p)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -883,10 +915,3 @@ def _fill_sampled_cell(cell, date_val, by_val):
                 f" {date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
-            _clear_orphan_underscores(p)
-
-
-def _clear_orphan_underscores(paragraph):
-    """Remove leftover underscore blocks from split-run boundaries."""
-    for run in paragraph.runs:
-        run.text = re.sub(r"_{3,}", "", run.text)
