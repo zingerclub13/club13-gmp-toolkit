@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title_extra %} — Receiving Record{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Generate Receiving Record</h1>
+        <p>Fill optional fields, then download CLB003 receiving record</p>
+    </div>
+</div>
+
+<div class="card" style="max-width:860px;">
+    <div class="card-header">{{ spec.spec_number }} — {{ spec.material_name }}</div>
+    <div class="card-body">
+        <form method="post" class="grid-2" style="gap:14px;">
+            <div>
+                <label>Spec Number</label>
+                <input type="text" value="{{ spec.spec_number }}" disabled>
+            </div>
+            <div>
+                <label>Material Code</label>
+                <input type="text" value="{{ spec.material_code or '' }}" disabled>
+            </div>
+            <div style="grid-column:1 / -1;">
+                <label>Material Name</label>
+                <input type="text" value="{{ spec.material_name }}" disabled>
+            </div>
+            <div style="grid-column:1 / -1;">
+                <label>PO Number (optional)</label>
+                <input type="text" name="po_number" placeholder="Enter PO number to print on record">
+            </div>
+
+            <div style="grid-column:1 / -1;display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                {% if spec_type == 'pk' %}
+                <a class="btn btn-outline" href="{{ url_for('pk_spec_detail', spec_id=spec.id) }}">Cancel</a>
+                {% else %}
+                <a class="btn btn-outline" href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}">Cancel</a>
+                {% endif %}
+                <button class="btn btn-primary" type="submit">⬇ Generate Receiving Record</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

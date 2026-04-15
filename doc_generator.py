@@ -450,13 +450,14 @@ def _copy_table(doc, src_table):
 # COMPONENT RECEIVING RECORD
 # ══════════════════════════════════════════════════════════════════
 
-def generate_receiving_record(template_path, spec, spec_type):
+def generate_receiving_record(template_path, spec, spec_type, po_number=""):
     """Generate a Component Receiving Record from the CLB003 template.
 
-    The template has two identical pages (duplicate form).
+    The template has two identical copies on one page; we keep only one copy.
     Fields filled from the spec:
       - COMPONENT CODE NO.  → spec.material_code
       - COMPONENT NAME      → spec.material_name
+      - PO NO.              → po_number (optional)
       - VENDOR              → spec.supplier
     All other fields (LOT NO., PO NO., DATE, etc.) are left blank for hand-fill.
 
@@ -464,9 +465,13 @@ def generate_receiving_record(template_path, spec, spec_type):
     """
     doc = Document(template_path)
 
+    # Keep only one receiving record copy on the sheet
+    _remove_second_receiving_copy(doc)
+
     field_map = {
         "COMPONENT CODE NO.:": _val(spec, "material_code"),
         "COMPONENT NAME:": _val(spec, "material_name"),
+        "PO NO.": po_number,
         "VENDOR:": _val(spec, "supplier"),
     }
 
@@ -479,6 +484,21 @@ def generate_receiving_record(template_path, spec, spec_type):
     output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     doc.save(output.name)
     return output.name
+
+
+def _remove_second_receiving_copy(doc):
+    """Remove duplicate receiving record copy; keep only first form on page."""
+    title_indices = [
+        i for i, p in enumerate(doc.paragraphs)
+        if "COMPONENT RECEIVING RECORD" in p.text.upper()
+    ]
+    if len(title_indices) < 2:
+        return
+
+    second_start = title_indices[1]
+    to_remove = list(doc.paragraphs[second_start:])
+    for p in to_remove:
+        p._element.getparent().remove(p._element)
 
 
 def _fill_underscore_field(paragraph, label, value):

@@ -560,7 +560,7 @@ def pk_spec_download(spec_id):
     return send_file(output_path, as_attachment=True, download_name=filename)
 
 
-@app.route("/packaging-specs/<int:spec_id>/receiving-record")
+@app.route("/packaging-specs/<int:spec_id>/receiving-record", methods=["GET", "POST"])
 @login_required
 def pk_receiving_record(spec_id):
     from doc_generator import generate_receiving_record
@@ -569,11 +569,17 @@ def pk_receiving_record(spec_id):
     if not spec:
         flash("Specification not found.", "danger")
         return redirect(url_for("pk_specs_list"))
+
+    if request.method == "GET":
+        return render_template("receiving_record_form.html", spec=spec, spec_type="pk")
+
     template_path = os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx")
     if not os.path.exists(template_path):
         flash("Receiving record template not uploaded. Go to Settings > Templates.", "danger")
         return redirect(url_for("pk_spec_detail", spec_id=spec_id))
-    output_path = generate_receiving_record(template_path, spec, "pk")
+
+    po_number = request.form.get("po_number", "").strip()
+    output_path = generate_receiving_record(template_path, spec, "pk", po_number=po_number)
     filename = f"PK-{spec['spec_number']}-Receiving-Record.docx"
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
@@ -756,7 +762,7 @@ def rm_spec_download(spec_id):
     return send_file(output_path, as_attachment=True, download_name=filename)
 
 
-@app.route("/raw-material-specs/<int:spec_id>/receiving-record")
+@app.route("/raw-material-specs/<int:spec_id>/receiving-record", methods=["GET", "POST"])
 @login_required
 def rm_receiving_record(spec_id):
     from doc_generator import generate_receiving_record
@@ -765,11 +771,17 @@ def rm_receiving_record(spec_id):
     if not spec:
         flash("Specification not found.", "danger")
         return redirect(url_for("rm_specs_list"))
+
+    if request.method == "GET":
+        return render_template("receiving_record_form.html", spec=spec, spec_type="rm")
+
     template_path = os.path.join(TEMPLATE_DIR, "CLB003 Component Receiving Record.docx")
     if not os.path.exists(template_path):
         flash("Receiving record template not uploaded. Go to Settings > Templates.", "danger")
         return redirect(url_for("rm_spec_detail", spec_id=spec_id))
-    output_path = generate_receiving_record(template_path, spec, "rm")
+
+    po_number = request.form.get("po_number", "").strip()
+    output_path = generate_receiving_record(template_path, spec, "rm", po_number=po_number)
     filename = f"RM-{spec['spec_number']}-Receiving-Record.docx"
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
