@@ -516,6 +516,17 @@ def generate_receiving_record(template_path, spec, spec_type, po_number=""):
             if label in text:
                 _fill_underscore_field(p, label, value)
 
+        if "COMPONENT CODE NO.:" in text and "COMPONENT NAME:" in text:
+            _bold_labels_in_paragraph(
+                p,
+                ["COMPONENT CODE NO.:", "COMPONENT NAME:", "LOT NO.:"]
+            )
+        elif "PO NO.:" in text and "VENDOR:" in text:
+            _bold_labels_in_paragraph(
+                p,
+                ["PO NO.:", "VENDOR:", "MANUFACTURER:", "MFR. LOT NO.:"]
+            )
+
     output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     doc.save(output.name)
     return output.name
@@ -777,6 +788,7 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
             # P4: Component# ________ Lot# ____________
             # Replace the 2 underscore blocks in order: component_code, lot_number
             _replace_underscores_sequential(p, [component_code, lot_number])
+            _bold_labels_in_paragraph(p, ["Component#", "Lot#"])
 
         elif "Component Name:" in text:
             # P6: Component Name:____________________
@@ -785,6 +797,7 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
                     if "___" in run.text:
                         run.text = re.sub(r"_{3,}", component_name, run.text, count=1)
                         break
+            _bold_labels_in_paragraph(p, ["Component Name:"])
 
         elif text.strip().startswith("_") and re.search(r"_{10,}", text):
             # P7: continuation underscores — clear only if name was provided
@@ -805,6 +818,7 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
                 f" {by_val}" if by_val else "",
             ]
             _replace_underscores_sequential(p, replacements)
+            _bold_labels_in_paragraph(p, ["Ctn#", "Date:", "By"])
 
 
 def _replace_underscore_after(paragraph, needle, value, occurrence=1):
@@ -947,11 +961,13 @@ def _fill_release_cell(cell, item_val, lot_val, date_val, by_val):
         text = p.text
         if "Item#" in text and "Lot" in text:
             _replace_underscores_sequential(p, [item_val, lot_val])
+            _bold_labels_in_paragraph(p, ["Item#:", "Lot:"])
         elif "Date" in text and "By" in text:
             _replace_underscores_sequential(p, [
                 f"{date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
+            _bold_labels_in_paragraph(p, ["Date:", "By:"])
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1007,3 +1023,4 @@ def _fill_sampled_cell(cell, date_val, by_val):
                 f" {date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
+            _bold_labels_in_paragraph(p, ["Date", "By:"])
