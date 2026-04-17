@@ -24,6 +24,7 @@ from copy import deepcopy
 
 from docx import Document
 from docx.oxml.ns import qn
+from docx.shared import Pt
 
 WPS_NS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -257,6 +258,7 @@ def _generate_spec_record(template_path, spec, parameters,
     doc = open_dotx(template_path)
     completion_fields = completion_fields or {}
     lot_number = (completion_fields.get("lot_number") or "").strip()
+    available_width = _get_available_width_pt(doc)
 
     # ── Fill header paragraphs ──────────────────────────────────
     for section in doc.sections:
@@ -316,6 +318,7 @@ def _generate_spec_record(template_path, spec, parameters,
                 (completion_fields.get("approved_by") or "").strip(),
                 (completion_fields.get("approved_date") or "").strip(),
             ])
+            _shrink_paragraph_to_fit(p, available_width)
 
 
     # ── Fill test parameters table(s) ───────────────────────────
@@ -487,6 +490,7 @@ def generate_receiving_record(template_path, spec, spec_type, po_number=""):
 
     # Keep only one receiving record copy on the sheet
     _remove_second_receiving_copy(doc)
+    available_width = _get_available_width_pt(doc)
 
     field_map = {
         "COMPONENT CODE NO.:": _val(spec, "material_code"),
@@ -497,10 +501,13 @@ def generate_receiving_record(template_path, spec, spec_type, po_number=""):
 
     for p in doc.paragraphs:
         text = p.text
+        filled = False
         for label, value in field_map.items():
             if label in text:
                 _fill_underscore_field(p, label, value)
-
+                filled = True
+        if filled:
+            _shrink_paragraph_to_fit(p, available_width)
 
     output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     doc.save(output.name)
@@ -544,6 +551,55 @@ def _fill_underscore_field(paragraph, label, value):
                 after = run.text[idx + m.end():]
                 run.text = before + str(value) + after
             return
+
+
+# ── Auto-fit helpers ────────────────────────────────────────────
+
+def _get_available_width_pt(doc):
+    """Return usable line width in points from page width minus margins."""
+    sec = doc.sections[0]
+    emu_width = sec.page_width - sec.left_margin - sec.right_margin
+    return emu_width / 12700  # EMU → points
+
+
+def _shrink_paragraph_to_fit(paragraph, available_width_pt):
+    """Reduce font size on all runs if the paragraph text overflows one line.
+
+    Uses a character-count heuristic (avg char width ≈ 0.52 × font size)
+    and shrinks by 0.5pt increments down to a minimum of 8pt.
+    No-op when the text already fits at its current size.
+    """
+    text = paragraph.text
+    if not text or len(text) < 5:
+        return
+
+    # Determine current font size (first run with a size, else 12pt default)
+    current_size_pt = 12.0
+    for run in paragraph.runs:
+        if run.font.size:
+            current_size_pt = run.font.size / 12700
+            break
+
+    avg_char_width_factor = 0.52
+    min_size_pt = 8.0
+
+    size = current_size_pt
+    while size >= min_size_pt:
+        estimated_width = len(text) * size * avg_char_width_factor
+        if estimated_width <= available_width_pt:
+            break
+        size -= 0.5
+
+    if size < min_size_pt:
+        size = min_size_pt
+
+    # Only apply if we actually need to shrink
+    if size >= current_size_pt:
+        return
+
+    pt_size = Pt(size)
+    for run in paragraph.runs:
+        run.font.size = pt_size
 
 
 # ══════════════════════════════════════════════════════════════════
