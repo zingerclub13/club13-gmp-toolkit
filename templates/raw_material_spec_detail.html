@@ -108,6 +108,44 @@
 
 <div class="card">
     <div class="card-header">
+        GMP Print Defaults
+        <span class="card-subtle">Saved values auto-fill the GMP Print Options page</span>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('rm_spec_print_settings', spec_id=spec.id) }}" class="grid-2" style="gap:12px;">
+            <div>
+                <label>Default Lot #</label>
+                <input type="text" name="print_default_lot_number" value="{{ spec.print_default_lot_number or '' }}" placeholder="Leave blank to hand-write">
+            </div>
+            <div></div>
+
+            <div>
+                <label>Default Written By</label>
+                <input type="text" name="print_default_written_by" value="{{ spec.print_default_written_by or '' }}" placeholder="e.g., DZ">
+            </div>
+            <div>
+                <label>Default Written Date</label>
+                <input type="text" name="print_default_written_date" value="{{ spec.print_default_written_date or '' }}" placeholder="MM/DD/YYYY">
+            </div>
+
+            <div>
+                <label>Default Approved By</label>
+                <input type="text" name="print_default_approved_by" value="{{ spec.print_default_approved_by or '' }}" placeholder="e.g., QA Manager">
+            </div>
+            <div>
+                <label>Default Approved Date</label>
+                <input type="text" name="print_default_approved_date" value="{{ spec.print_default_approved_date or '' }}" placeholder="MM/DD/YYYY">
+            </div>
+
+            <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;">
+                <button class="btn btn-outline" type="submit">Save Print Defaults</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
         3rd Party Attachments
         <span class="card-subtle">COAs, vendor specifications, or supporting documents — appended as separate pages when downloaded</span>
     </div>

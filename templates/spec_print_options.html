@@ -23,26 +23,26 @@
 
             <div>
                 <label>Lot # (optional)</label>
-                <input type="text" name="lot_number" placeholder="Leave blank to hand-write">
+                <input type="text" name="lot_number" value="{{ spec.print_default_lot_number or '' }}" placeholder="Leave blank to hand-write">
             </div>
             <div></div>
 
             <div>
                 <label>Written By (optional)</label>
-                <input type="text" name="written_by" placeholder="e.g., DZ">
+                <input type="text" name="written_by" value="{{ spec.print_default_written_by or '' }}" placeholder="e.g., DZ">
             </div>
             <div>
                 <label>Written Date (optional)</label>
-                <input type="text" name="written_date" placeholder="MM/DD/YYYY">
+                <input type="text" name="written_date" value="{{ spec.print_default_written_date or '' }}" placeholder="MM/DD/YYYY">
             </div>
 
             <div>
                 <label>Approved By (optional)</label>
-                <input type="text" name="approved_by" placeholder="e.g., QA Manager">
+                <input type="text" name="approved_by" value="{{ spec.print_default_approved_by or '' }}" placeholder="e.g., QA Manager">
             </div>
             <div>
                 <label>Approved Date (optional)</label>
-                <input type="text" name="approved_date" placeholder="MM/DD/YYYY">
+                <input type="text" name="approved_date" value="{{ spec.print_default_approved_date or '' }}" placeholder="MM/DD/YYYY">
             </div>
 
             <div style="grid-column:1 / -1;display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">

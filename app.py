@@ -86,6 +86,14 @@ def hash_password(password):
     return generate_password_hash(password, method="pbkdf2:sha256")
 
 
+def _ensure_column(db, table_name, column_def):
+    """Add a column to a table if it does not already exist."""
+    col_name = column_def.split()[0]
+    existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    if col_name not in existing:
+        db.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_def}")
+
+
 def init_db():
     db = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
@@ -301,6 +309,14 @@ def init_db():
             "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
             ("staff", hash_password("club13staff"), "QA Staff", "staff"),
         )
+
+    # Backwards-compatible schema additions for persisted print defaults
+    for table_name in ("packaging_specs", "raw_material_specs"):
+        _ensure_column(db, table_name, "print_default_lot_number TEXT DEFAULT ''")
+        _ensure_column(db, table_name, "print_default_written_by TEXT DEFAULT ''")
+        _ensure_column(db, table_name, "print_default_written_date TEXT DEFAULT ''")
+        _ensure_column(db, table_name, "print_default_approved_by TEXT DEFAULT ''")
+        _ensure_column(db, table_name, "print_default_approved_date TEXT DEFAULT ''")
 
     db.commit()
     db.close()
@@ -604,6 +620,38 @@ def pk_receiving_record(spec_id):
     return send_file(output_path, as_attachment=True, download_name=filename)
 
 
+@app.route("/packaging-specs/<int:spec_id>/print-settings", methods=["POST"])
+@login_required
+def pk_spec_print_settings(spec_id):
+    db = get_db()
+    spec = db.execute("SELECT id FROM packaging_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("pk_specs_list"))
+
+    db.execute(
+        """UPDATE packaging_specs
+           SET print_default_lot_number = ?,
+               print_default_written_by = ?,
+               print_default_written_date = ?,
+               print_default_approved_by = ?,
+               print_default_approved_date = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (
+            request.form.get("print_default_lot_number", "").strip(),
+            request.form.get("print_default_written_by", "").strip(),
+            request.form.get("print_default_written_date", "").strip(),
+            request.form.get("print_default_approved_by", "").strip(),
+            request.form.get("print_default_approved_date", "").strip(),
+            spec_id,
+        ),
+    )
+    db.commit()
+    flash("GMP print defaults saved.", "success")
+    return redirect(url_for("pk_spec_detail", spec_id=spec_id))
+
+
 # ══════════════════════════════════════════════════════════════════
 # RAW MATERIAL SPECIFICATIONS
 # ══════════════════════════════════════════════════════════════════
@@ -788,6 +836,38 @@ def rm_spec_download(spec_id):
     )
     db.commit()
     return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+@app.route("/raw-material-specs/<int:spec_id>/print-settings", methods=["POST"])
+@login_required
+def rm_spec_print_settings(spec_id):
+    db = get_db()
+    spec = db.execute("SELECT id FROM raw_material_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("rm_specs_list"))
+
+    db.execute(
+        """UPDATE raw_material_specs
+           SET print_default_lot_number = ?,
+               print_default_written_by = ?,
+               print_default_written_date = ?,
+               print_default_approved_by = ?,
+               print_default_approved_date = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (
+            request.form.get("print_default_lot_number", "").strip(),
+            request.form.get("print_default_written_by", "").strip(),
+            request.form.get("print_default_written_date", "").strip(),
+            request.form.get("print_default_approved_by", "").strip(),
+            request.form.get("print_default_approved_date", "").strip(),
+            spec_id,
+        ),
+    )
+    db.commit()
+    flash("GMP print defaults saved.", "success")
+    return redirect(url_for("rm_spec_detail", spec_id=spec_id))
 
 
 @app.route("/raw-material-specs/<int:spec_id>/receiving-record", methods=["GET", "POST"])

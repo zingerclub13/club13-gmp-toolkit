@@ -297,12 +297,13 @@ def _generate_spec_record(template_path, spec, parameters,
                     _fill_after_label(p, "Component Name:", spec["material_name"])
 
     # ── Fill vendor in body (replace underscores in the correct runs) ──
+    supplier_val = (_val(spec, "supplier") or "").strip()
     for p in doc.paragraphs:
         if "Vendor:" not in p.text:
             continue
         for run in p.runs:
-            if "Vendor:" in run.text and "___" in run.text:
-                _replace_underscores(run, _val(spec, "supplier"))
+            if "Vendor:" in run.text and "___" in run.text and supplier_val:
+                _replace_underscores(run, supplier_val)
             # Don't touch "Vendor's Lot No." underscores — filled by hand
 
     # ── Optional completion fields in body (written/approved/date) ───────
