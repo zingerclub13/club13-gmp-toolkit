@@ -316,6 +316,22 @@ def _generate_spec_record(template_path, spec, parameters,
                 (completion_fields.get("approved_by") or "").strip(),
                 (completion_fields.get("approved_date") or "").strip(),
             ])
+            _bold_labels_in_paragraph(
+                p,
+                ["Written By:", "Date:", "Approved By:"]
+            )
+
+        elif "Sample Received:" in text and "Logged in By:" in text:
+            _bold_labels_in_paragraph(
+                p,
+                ["Sample Received:", "Time:", "Date:", "Logged in By:"]
+            )
+
+        elif "Vendor:" in text and "Lot No.:" in text:
+            _bold_labels_in_paragraph(
+                p,
+                ["Vendor:", "Vendor's Lot No.:", "Vendor’s Lot No.:", "Lot No.:"]
+            )
 
     # ── Fill test parameters table(s) ───────────────────────────
     tables = doc.tables
@@ -542,6 +558,40 @@ def _fill_underscore_field(paragraph, label, value):
                 after = run.text[idx + m.end():]
                 run.text = before + str(value) + after
             return
+
+
+def _bold_labels_in_paragraph(paragraph, labels):
+    """Bold specified label tokens and keep non-label text regular."""
+    text = paragraph.text
+    if not text:
+        return
+
+    escaped = [re.escape(lbl) for lbl in labels if lbl]
+    if not escaped:
+        return
+
+    pattern = re.compile("|".join(sorted(escaped, key=len, reverse=True)))
+    matches = list(pattern.finditer(text))
+    if not matches:
+        return
+
+    p_elem = paragraph._element
+    for child in list(p_elem):
+        if child.tag in (qn("w:r"), qn("w:hyperlink"), qn("w:smartTag")):
+            p_elem.remove(child)
+
+    cursor = 0
+    for m in matches:
+        if m.start() > cursor:
+            run = paragraph.add_run(text[cursor:m.start()])
+            run.bold = False
+        run = paragraph.add_run(m.group(0))
+        run.bold = True
+        cursor = m.end()
+
+    if cursor < len(text):
+        run = paragraph.add_run(text[cursor:])
+        run.bold = False
 
 
 # ══════════════════════════════════════════════════════════════════
