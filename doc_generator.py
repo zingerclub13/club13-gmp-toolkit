@@ -558,37 +558,60 @@ def _fill_underscore_field(paragraph, label, value):
 
 
 def _bold_labels_in_paragraph(paragraph, labels):
-    """Bold specified label tokens and keep non-label text regular."""
-    text = paragraph.text
-    if not text:
-        return
+    """Bold specified label tokens while preserving existing run/template formatting.
 
+    IMPORTANT: this function only rewrites individual runs that contain a label
+    token. It does NOT rebuild the whole paragraph, which avoids stripping
+    template-level formatting (e.g., rules/underlines/shape-linked content).
+    """
     escaped = [re.escape(lbl) for lbl in labels if lbl]
     if not escaped:
         return
 
     pattern = re.compile("|".join(sorted(escaped, key=len, reverse=True)))
-    matches = list(pattern.finditer(text))
-    if not matches:
-        return
 
-    p_elem = paragraph._element
-    for child in list(p_elem):
-        if child.tag in (qn("w:r"), qn("w:hyperlink"), qn("w:smartTag")):
-            p_elem.remove(child)
+    # Iterate over a snapshot since we'll replace matching runs in-place.
+    for run in list(paragraph.runs):
+        text = run.text
+        if not text:
+            continue
 
-    cursor = 0
-    for m in matches:
-        if m.start() > cursor:
-            run = paragraph.add_run(text[cursor:m.start()])
-            run.bold = False
-        run = paragraph.add_run(m.group(0))
-        run.bold = True
-        cursor = m.end()
+        matches = list(pattern.finditer(text))
+        if not matches:
+            continue
 
-    if cursor < len(text):
-        run = paragraph.add_run(text[cursor:])
-        run.bold = False
+        r_elem = run._element
+        rPr = r_elem.find(qn("w:rPr"))
+        rPr_copy = deepcopy(rPr) if rPr is not None else None
+
+        cursor = 0
+        new_elems = []
+        for m in matches:
+            if m.start() > cursor:
+                plain = paragraph.add_run(text[cursor:m.start()])
+                if rPr_copy is not None:
+                    plain._element.insert(0, deepcopy(rPr_copy))
+                plain.bold = False
+                new_elems.append(plain._element)
+
+            bolded = paragraph.add_run(m.group(0))
+            if rPr_copy is not None:
+                bolded._element.insert(0, deepcopy(rPr_copy))
+            bolded.bold = True
+            new_elems.append(bolded._element)
+            cursor = m.end()
+
+        if cursor < len(text):
+            tail = paragraph.add_run(text[cursor:])
+            if rPr_copy is not None:
+                tail._element.insert(0, deepcopy(rPr_copy))
+            tail.bold = False
+            new_elems.append(tail._element)
+
+        # Move the new run elements before the original run, then remove original.
+        for new_elem in new_elems:
+            r_elem.addprevious(new_elem)
+        r_elem.getparent().remove(r_elem)
 
 
 # ── Auto-fit helpers ────────────────────────────────────────────
