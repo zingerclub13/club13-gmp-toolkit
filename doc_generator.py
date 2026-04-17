@@ -316,22 +316,7 @@ def _generate_spec_record(template_path, spec, parameters,
                 (completion_fields.get("approved_by") or "").strip(),
                 (completion_fields.get("approved_date") or "").strip(),
             ])
-            _bold_labels_in_paragraph(
-                p,
-                ["Written By:", "Date:", "Approved By:"]
-            )
 
-        elif "Sample Received:" in text and "Logged in By:" in text:
-            _bold_labels_in_paragraph(
-                p,
-                ["Sample Received:", "Time:", "Date:", "Logged in By:"]
-            )
-
-        elif "Vendor:" in text and "Lot No.:" in text:
-            _bold_labels_in_paragraph(
-                p,
-                ["Vendor:", "Vendor's Lot No.:", "Vendor’s Lot No.:", "Lot No.:"]
-            )
 
     # ── Fill test parameters table(s) ───────────────────────────
     tables = doc.tables
@@ -516,16 +501,6 @@ def generate_receiving_record(template_path, spec, spec_type, po_number=""):
             if label in text:
                 _fill_underscore_field(p, label, value)
 
-        if "COMPONENT CODE NO.:" in text and "COMPONENT NAME:" in text:
-            _bold_labels_in_paragraph(
-                p,
-                ["COMPONENT CODE NO.:", "COMPONENT NAME:", "LOT NO.:"]
-            )
-        elif "PO NO.:" in text and "VENDOR:" in text:
-            _bold_labels_in_paragraph(
-                p,
-                ["PO NO.:", "VENDOR:", "MANUFACTURER:", "MFR. LOT NO.:"]
-            )
 
     output = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     doc.save(output.name)
@@ -569,40 +544,6 @@ def _fill_underscore_field(paragraph, label, value):
                 after = run.text[idx + m.end():]
                 run.text = before + str(value) + after
             return
-
-
-def _bold_labels_in_paragraph(paragraph, labels):
-    """Bold specified label tokens and keep non-label text regular."""
-    text = paragraph.text
-    if not text:
-        return
-
-    escaped = [re.escape(lbl) for lbl in labels if lbl]
-    if not escaped:
-        return
-
-    pattern = re.compile("|".join(sorted(escaped, key=len, reverse=True)))
-    matches = list(pattern.finditer(text))
-    if not matches:
-        return
-
-    p_elem = paragraph._element
-    for child in list(p_elem):
-        if child.tag in (qn("w:r"), qn("w:hyperlink"), qn("w:smartTag")):
-            p_elem.remove(child)
-
-    cursor = 0
-    for m in matches:
-        if m.start() > cursor:
-            run = paragraph.add_run(text[cursor:m.start()])
-            run.bold = False
-        run = paragraph.add_run(m.group(0))
-        run.bold = True
-        cursor = m.end()
-
-    if cursor < len(text):
-        run = paragraph.add_run(text[cursor:])
-        run.bold = False
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -788,7 +729,6 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
             # P4: Component# ________ Lot# ____________
             # Replace the 2 underscore blocks in order: component_code, lot_number
             _replace_underscores_sequential(p, [component_code, lot_number])
-            _bold_labels_in_paragraph(p, ["Component#", "Lot#"])
 
         elif "Component Name:" in text:
             # P6: Component Name:____________________
@@ -797,7 +737,6 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
                     if "___" in run.text:
                         run.text = re.sub(r"_{3,}", component_name, run.text, count=1)
                         break
-            _bold_labels_in_paragraph(p, ["Component Name:"])
 
         elif text.strip().startswith("_") and re.search(r"_{10,}", text):
             # P7: continuation underscores — clear only if name was provided
@@ -818,7 +757,6 @@ def _fill_tag_cell(cell, component_code, component_name, lot_number,
                 f" {by_val}" if by_val else "",
             ]
             _replace_underscores_sequential(p, replacements)
-            _bold_labels_in_paragraph(p, ["Ctn#", "Date:", "By"])
 
 
 def _replace_underscore_after(paragraph, needle, value, occurrence=1):
@@ -961,13 +899,11 @@ def _fill_release_cell(cell, item_val, lot_val, date_val, by_val):
         text = p.text
         if "Item#" in text and "Lot" in text:
             _replace_underscores_sequential(p, [item_val, lot_val])
-            _bold_labels_in_paragraph(p, ["Item#:", "Lot:"])
         elif "Date" in text and "By" in text:
             _replace_underscores_sequential(p, [
                 f"{date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
-            _bold_labels_in_paragraph(p, ["Date:", "By:"])
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1023,4 +959,3 @@ def _fill_sampled_cell(cell, date_val, by_val):
                 f" {date_val} " if date_val else "",
                 f" {by_val}" if by_val else "",
             ])
-            _bold_labels_in_paragraph(p, ["Date", "By:"])
