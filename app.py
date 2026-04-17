@@ -533,7 +533,7 @@ def pk_spec_delete(spec_id):
     return redirect(url_for("pk_specs_list"))
 
 
-@app.route("/packaging-specs/<int:spec_id>/download")
+@app.route("/packaging-specs/<int:spec_id>/download", methods=["GET", "POST"])
 @login_required
 def pk_spec_download(spec_id):
     from doc_generator import generate_pk_spec_record
@@ -542,6 +542,10 @@ def pk_spec_download(spec_id):
     if not spec:
         flash("Specification not found.", "danger")
         return redirect(url_for("pk_specs_list"))
+
+    if request.method == "GET":
+        return render_template("spec_print_options.html", spec=spec, spec_type="pk")
+
     parameters = db.execute(
         "SELECT * FROM pk_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
@@ -549,8 +553,19 @@ def pk_spec_download(spec_id):
     if not os.path.exists(template_path):
         flash("PK template not uploaded. Go to Settings > Templates.", "danger")
         return redirect(url_for("pk_spec_detail", spec_id=spec_id))
-    output_path = generate_pk_spec_record(template_path, spec, parameters,
-                                           attachment_paths=_get_attachment_paths("pk", spec_id))
+    completion_fields = {
+        "lot_number": request.form.get("lot_number", "").strip(),
+        "written_by": request.form.get("written_by", "").strip(),
+        "written_date": request.form.get("written_date", "").strip(),
+        "approved_by": request.form.get("approved_by", "").strip(),
+        "approved_date": request.form.get("approved_date", "").strip(),
+    }
+
+    output_path = generate_pk_spec_record(
+        template_path, spec, parameters,
+        completion_fields=completion_fields,
+        attachment_paths=_get_attachment_paths("pk", spec_id),
+    )
     filename = f"PK-{spec['spec_number']}-Test-Record.docx"
     db.execute(
         "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
@@ -730,7 +745,7 @@ def rm_spec_delete(spec_id):
     return redirect(url_for("rm_specs_list"))
 
 
-@app.route("/raw-material-specs/<int:spec_id>/download")
+@app.route("/raw-material-specs/<int:spec_id>/download", methods=["GET", "POST"])
 @login_required
 def rm_spec_download(spec_id):
     from doc_generator import generate_rm_spec_record
@@ -739,6 +754,10 @@ def rm_spec_download(spec_id):
     if not spec:
         flash("Specification not found.", "danger")
         return redirect(url_for("rm_specs_list"))
+
+    if request.method == "GET":
+        return render_template("spec_print_options.html", spec=spec, spec_type="rm")
+
     parameters = db.execute(
         "SELECT * FROM rm_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
     ).fetchall()
@@ -748,9 +767,18 @@ def rm_spec_download(spec_id):
     if not os.path.exists(template_path):
         flash("RM template not uploaded. Go to Settings > Templates.", "danger")
         return redirect(url_for("rm_spec_detail", spec_id=spec_id))
+    completion_fields = {
+        "lot_number": request.form.get("lot_number", "").strip(),
+        "written_by": request.form.get("written_by", "").strip(),
+        "written_date": request.form.get("written_date", "").strip(),
+        "approved_by": request.form.get("approved_by", "").strip(),
+        "approved_date": request.form.get("approved_date", "").strip(),
+    }
+
     output_path = generate_rm_spec_record(
         template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
+        completion_fields=completion_fields,
         attachment_paths=_get_attachment_paths("rm", spec_id),
     )
     filename = f"RM-{spec['spec_number']}-Test-Record.docx"

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title_extra %} — GMP Print Options{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>GMP Print Options</h1>
+        <p>Optionally pre-fill approval metadata before generating the completed template</p>
+    </div>
+</div>
+
+<div class="card" style="max-width:980px;">
+    <div class="card-header">{{ spec.spec_number }} — {{ spec.material_name }}</div>
+    <div class="card-body">
+        <form method="post" class="grid-2" style="gap:14px;">
+            <div>
+                <label>Spec Number</label>
+                <input type="text" value="{{ spec.spec_number }}" disabled>
+            </div>
+            <div>
+                <label>Material Code</label>
+                <input type="text" value="{{ spec.material_code or '' }}" disabled>
+            </div>
+
+            <div>
+                <label>Lot # (optional)</label>
+                <input type="text" name="lot_number" placeholder="Leave blank to hand-write">
+            </div>
+            <div></div>
+
+            <div>
+                <label>Written By (optional)</label>
+                <input type="text" name="written_by" placeholder="e.g., DZ">
+            </div>
+            <div>
+                <label>Written Date (optional)</label>
+                <input type="text" name="written_date" placeholder="MM/DD/YYYY">
+            </div>
+
+            <div>
+                <label>Approved By (optional)</label>
+                <input type="text" name="approved_by" placeholder="e.g., QA Manager">
+            </div>
+            <div>
+                <label>Approved Date (optional)</label>
+                <input type="text" name="approved_date" placeholder="MM/DD/YYYY">
+            </div>
+
+            <div style="grid-column:1 / -1;display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                {% if spec_type == 'pk' %}
+                <a class="btn btn-outline" href="{{ url_for('pk_spec_detail', spec_id=spec.id) }}">Cancel</a>
+                {% else %}
+                <a class="btn btn-outline" href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}">Cancel</a>
+                {% endif %}
+                <button class="btn btn-primary" type="submit">⬇ Generate Test Record</button>
+            </div>
+        </form>
+
+        <p style="margin-top:12px;color:var(--c13-text-muted);font-size:0.85rem;">
+            Any field left blank stays as an underline on the printed document for manual completion.
+        </p>
+    </div>
+</div>
+{% endblock %}

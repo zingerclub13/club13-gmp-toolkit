@@ -218,14 +218,17 @@ def _find_sibling_rPr(row_tr, skip_col):
 # PK / RM SPECIFICATION TEST RECORD
 # ══════════════════════════════════════════════════════════════════
 
-def generate_pk_spec_record(template_path, spec, parameters, attachment_paths=None):
+def generate_pk_spec_record(template_path, spec, parameters,
+                            completion_fields=None, attachment_paths=None):
     """Generate a PK Specification Test Record with spec info filled in."""
     return _generate_spec_record(template_path, spec, parameters,
+                                 completion_fields=completion_fields,
                                  attachment_paths=attachment_paths)
 
 
 def generate_rm_spec_record(template_path, spec, parameters,
                             direct_params=None, coa_params=None,
+                            completion_fields=None,
                             attachment_paths=None):
     """Generate an RM Specification Test Record with spec info filled in.
 
@@ -235,12 +238,14 @@ def generate_rm_spec_record(template_path, spec, parameters,
     return _generate_spec_record(
         template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
+        completion_fields=completion_fields,
         attachment_paths=attachment_paths,
     )
 
 
 def _generate_spec_record(template_path, spec, parameters,
                           direct_params=None, coa_params=None,
+                          completion_fields=None,
                           attachment_paths=None):
     """Shared logic for PK and RM spec record generation.
 
@@ -250,6 +255,8 @@ def _generate_spec_record(template_path, spec, parameters,
     Leaves Results / P / F columns blank for hand-filling.
     """
     doc = open_dotx(template_path)
+    completion_fields = completion_fields or {}
+    lot_number = (completion_fields.get("lot_number") or "").strip()
 
     # ── Fill header paragraphs ──────────────────────────────────
     for section in doc.sections:
@@ -263,12 +270,12 @@ def _generate_spec_record(template_path, spec, parameters,
             # Check for FILLIN merge fields in this paragraph
             has_fields = bool(p_elem.findall(f".//{{{W_NS}}}fldChar"))
 
-            if "NO.:" in text and "____________" in text:
-                # "LOT NO.: ____________" — replace underscores with spec number
-                # Handle smartTag wrapping "LOT" by iterating all runs
+            if "NO.:" in text and "____________" in text and lot_number:
+                # "LOT NO.: ____________" — optional fill from print options
+                # Leave underscores intact when lot_number is blank.
                 for run in p.runs:
                     if "____________" in run.text:
-                        _replace_underscores(run, spec["spec_number"])
+                        _replace_underscores(run, lot_number)
 
             elif "Component No.:" in text and "Rev. No.:" in text:
                 if has_fields:
@@ -297,6 +304,17 @@ def _generate_spec_record(template_path, spec, parameters,
             if "Vendor:" in run.text and "___" in run.text:
                 _replace_underscores(run, _val(spec, "supplier"))
             # Don't touch "Vendor's Lot No." underscores — filled by hand
+
+    # ── Optional completion fields in body (written/approved/date) ───────
+    for p in doc.paragraphs:
+        text = p.text
+        if "Written By:" in text and "Approved By:" in text:
+            _replace_underscores_sequential(p, [
+                (completion_fields.get("written_by") or "").strip(),
+                (completion_fields.get("written_date") or "").strip(),
+                (completion_fields.get("approved_by") or "").strip(),
+                (completion_fields.get("approved_date") or "").strip(),
+            ])
 
     # ── Fill test parameters table(s) ───────────────────────────
     tables = doc.tables
@@ -509,6 +527,9 @@ def _fill_underscore_field(paragraph, label, value):
     This function replaces only the underscore block immediately after the
     specified label, leaving other underscore blocks intact.
     """
+    if not value:
+        return
+
     for run in paragraph.runs:
         if label in run.text:
             # Find the label position and the underscore block after it
@@ -518,7 +539,7 @@ def _fill_underscore_field(paragraph, label, value):
             if m:
                 before = run.text[:idx + m.start()]
                 after = run.text[idx + m.end():]
-                run.text = before + (str(value) if value else "") + after
+                run.text = before + str(value) + after
             return
 
 
