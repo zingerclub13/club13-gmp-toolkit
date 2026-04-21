@@ -22,7 +22,11 @@ import tempfile
 import zipfile
 from copy import deepcopy
 
+import fitz
+from PIL import Image
 from docx import Document
+from docx.enum.section import WD_ORIENT, WD_SECTION
+from docx.enum.text import WD_BREAK
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
@@ -400,42 +404,83 @@ def _fill_spec_table(table, parameters, route_method_to_reference=False):
 
 # ── Attachment appender ─────────────────────────────────────────
 
+def _configure_section_orientation(section, landscape):
+    """Set section orientation while preserving the original long/short edges."""
+    long_edge = max(section.page_width, section.page_height)
+    short_edge = min(section.page_width, section.page_height)
+    section.orientation = WD_ORIENT.LANDSCAPE if landscape else WD_ORIENT.PORTRAIT
+    section.page_width = long_edge if landscape else short_edge
+    section.page_height = short_edge if landscape else long_edge
+
+
+def _fit_size_pt(src_width, src_height, max_width_pt, max_height_pt):
+    """Return fitted width/height in points while preserving aspect ratio."""
+    if src_width <= 0 or src_height <= 0:
+        return max_width_pt, max_height_pt
+
+    scale = min(max_width_pt / src_width, max_height_pt / src_height)
+    scale = min(scale, 1.0)
+    return src_width * scale, src_height * scale
+
+
+def _add_attachment_heading(doc, text):
+    heading = doc.add_paragraph()
+    heading.alignment = 1
+    run = heading.add_run(text)
+    run.bold = True
+    run.font.size = Pt(10)
+
+
+def _add_fitted_attachment_page(doc, image_source, pixel_width, pixel_height, heading_text):
+    """Add an attachment page with orientation chosen from the image aspect ratio."""
+    section = doc.add_section(WD_SECTION.NEW_PAGE)
+    _configure_section_orientation(section, landscape=pixel_width > pixel_height)
+
+    _add_attachment_heading(doc, heading_text)
+
+    usable_width_pt = (section.page_width - section.left_margin - section.right_margin) / 12700
+    usable_height_pt = (section.page_height - section.top_margin - section.bottom_margin) / 12700 - 24
+    usable_height_pt = max(usable_height_pt, 72)
+
+    width_pt, height_pt = _fit_size_pt(pixel_width, pixel_height, usable_width_pt, usable_height_pt)
+    pic_para = doc.add_paragraph()
+    pic_para.alignment = 1
+    pic_para.add_run().add_picture(image_source, width=Pt(width_pt), height=Pt(height_pt))
+
+
 def _append_attachments(doc, attachment_paths):
     """Append 3rd-party attachments as separate pages in the document.
 
     attachment_paths: list of (original_name, file_path) tuples.
 
-    - Images (.png, .jpg, .jpeg) are inserted full-width on a new page.
+    - Images (.png, .jpg, .jpeg) are inserted on their own page and auto-fit.
     - .docx files are merged paragraph-by-paragraph on a new page.
-    - .pdf / other: a reference page is added noting the attached file.
+    - .pdf files are rendered page-by-page and auto-fit with portrait/landscape.
+    - Other file types get a reference page.
     """
-    from docx.shared import Inches, Pt
-    from docx.enum.text import WD_BREAK
-
     for original_name, file_path in attachment_paths:
         ext = os.path.splitext(file_path)[1].lower()
 
-        # Add page break before each attachment
-        bp = doc.add_paragraph()
-        bp.runs[0].add_break(WD_BREAK.PAGE) if bp.runs else bp.add_run().add_break(WD_BREAK.PAGE)
-
         if ext in (".png", ".jpg", ".jpeg"):
-            # Insert image — fit to page width
-            heading = doc.add_paragraph()
-            run = heading.add_run(f"Attachment: {original_name}")
-            run.bold = True
-            run.font.size = Pt(11)
             try:
-                doc.add_picture(file_path, width=Inches(6.5))
+                with Image.open(file_path) as img:
+                    width_px, height_px = img.size
+                _add_fitted_attachment_page(
+                    doc,
+                    file_path,
+                    width_px,
+                    height_px,
+                    f"Attachment: {original_name}",
+                )
             except Exception:
+                doc.add_section(WD_SECTION.NEW_PAGE)
+                _add_attachment_heading(doc, f"Attachment: {original_name}")
                 doc.add_paragraph(f"[Image could not be embedded: {original_name}]")
 
         elif ext == ".docx":
             # Merge .docx content paragraph-by-paragraph
-            heading = doc.add_paragraph()
-            run = heading.add_run(f"Attachment: {original_name}")
-            run.bold = True
-            run.font.size = Pt(11)
+            doc.add_section(WD_SECTION.NEW_PAGE)
+            _add_attachment_heading(doc, f"Attachment: {original_name}")
             try:
                 att_doc = Document(file_path)
                 for p in att_doc.paragraphs:
@@ -454,20 +499,30 @@ def _append_attachments(doc, attachment_paths):
                 doc.add_paragraph(f"[Document could not be embedded: {original_name}]")
 
         elif ext == ".pdf":
-            heading = doc.add_paragraph()
-            run = heading.add_run(f"Attachment: {original_name}")
-            run.bold = True
-            run.font.size = Pt(11)
-            doc.add_paragraph(
-                "This PDF attachment is included as a separate file. "
-                "Please refer to the uploaded PDF document."
-            )
+            try:
+                pdf_doc = fitz.open(file_path)
+                page_total = len(pdf_doc)
+                for page_index, page in enumerate(pdf_doc, start=1):
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                    image_bytes = io.BytesIO(pix.tobytes("png"))
+                    _add_fitted_attachment_page(
+                        doc,
+                        image_bytes,
+                        pix.width,
+                        pix.height,
+                        f"Attachment: {original_name} — Page {page_index} of {page_total}",
+                    )
+                pdf_doc.close()
+            except Exception:
+                doc.add_section(WD_SECTION.NEW_PAGE)
+                _add_attachment_heading(doc, f"Attachment: {original_name}")
+                doc.add_paragraph(
+                    "[PDF could not be rendered into the generated document. Please refer to the uploaded PDF file.]"
+                )
 
         else:
-            heading = doc.add_paragraph()
-            run = heading.add_run(f"Attachment: {original_name}")
-            run.bold = True
-            run.font.size = Pt(11)
+            doc.add_section(WD_SECTION.NEW_PAGE)
+            _add_attachment_heading(doc, f"Attachment: {original_name}")
             doc.add_paragraph(f"[File type {ext} — see uploaded attachment]")
 
 
