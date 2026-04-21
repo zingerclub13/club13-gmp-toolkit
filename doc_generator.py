@@ -220,17 +220,20 @@ def _find_sibling_rPr(row_tr, skip_col):
 # ══════════════════════════════════════════════════════════════════
 
 def generate_pk_spec_record(template_path, spec, parameters,
-                            completion_fields=None, attachment_paths=None):
+                       completion_fields=None, attachment_paths=None,
+                       route_method_to_reference=False):
     """Generate a PK Specification Test Record with spec info filled in."""
     return _generate_spec_record(template_path, spec, parameters,
                                  completion_fields=completion_fields,
-                                 attachment_paths=attachment_paths)
+                           attachment_paths=attachment_paths,
+                           route_method_to_reference=route_method_to_reference)
 
 
 def generate_rm_spec_record(template_path, spec, parameters,
                             direct_params=None, coa_params=None,
                             completion_fields=None,
-                            attachment_paths=None):
+                            attachment_paths=None,
+                            route_method_to_reference=False):
     """Generate an RM Specification Test Record with spec info filled in.
 
     If direct_params/coa_params are provided, they are used for the two
@@ -241,13 +244,15 @@ def generate_rm_spec_record(template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
         completion_fields=completion_fields,
         attachment_paths=attachment_paths,
+        route_method_to_reference=route_method_to_reference,
     )
 
 
 def _generate_spec_record(template_path, spec, parameters,
                           direct_params=None, coa_params=None,
                           completion_fields=None,
-                          attachment_paths=None):
+                          attachment_paths=None,
+                          route_method_to_reference=False):
     """Shared logic for PK and RM spec record generation.
 
     Fills header fields (NO, Component No, Rev No, Component Name) and
@@ -332,13 +337,13 @@ def _generate_spec_record(template_path, spec, parameters,
         for table in tables:
             header_text = table.rows[0].cells[0].text.strip()
             if header_text == "Characteristic":
-                _fill_spec_table(table, direct_params or [])
+                _fill_spec_table(table, direct_params or [], route_method_to_reference=route_method_to_reference)
             elif "From C of A" in header_text:
-                _fill_spec_table(table, coa_params or [])
+                _fill_spec_table(table, coa_params or [], route_method_to_reference=route_method_to_reference)
     else:
         # PK (single table) or RM without split
         for table in tables:
-            _fill_spec_table(table, parameters)
+            _fill_spec_table(table, parameters, route_method_to_reference=route_method_to_reference)
 
     # ── Append 3rd-party attachments as separate pages ────────────
     if attachment_paths:
@@ -350,7 +355,7 @@ def _generate_spec_record(template_path, spec, parameters,
     return output.name
 
 
-def _fill_spec_table(table, parameters):
+def _fill_spec_table(table, parameters, route_method_to_reference=False):
     """Fill a Characteristic / Specifications table with parameter rows.
 
     Strategy:
@@ -385,7 +390,10 @@ def _fill_spec_table(table, parameters):
         new_tr = deepcopy(template_tr)
         _set_row_cell_text(new_tr, 0, param["parameter_name"])
         _set_row_cell_text(new_tr, 1, _val(param, "acceptance_criteria"))
-        # Cols 2-3 (Results, Reference) left blank for hand-fill
+        if route_method_to_reference:
+            _set_row_cell_text(new_tr, 3, _val(param, "test_method"))
+        # Col 2 (Results) left blank for hand-fill
+        # Col 3 (Reference) blank unless route_method_to_reference is enabled
         # Cols 4-5 (P, F) keep their template text for circling on paper
         tbl_elem.append(new_tr)
 

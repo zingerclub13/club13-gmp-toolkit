@@ -136,6 +136,44 @@
             }
         });
     });
+
+    document.querySelectorAll('[data-attachment-dropzone]').forEach(function(zone) {
+        const input = zone.querySelector('[data-attachment-input]');
+        const fileLabel = zone.querySelector('[data-attachment-file]');
+        if (!input) return;
+
+        function setFileName(file) {
+            if (!fileLabel) return;
+            fileLabel.textContent = file ? `Selected: ${file.name}` : '';
+        }
+
+        input.addEventListener('change', function() {
+            setFileName(input.files && input.files[0]);
+        });
+
+        ['dragenter', 'dragover'].forEach(function(evtName) {
+            zone.addEventListener(evtName, function(e) {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'dragend', 'drop'].forEach(function(evtName) {
+            zone.addEventListener(evtName, function(e) {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+            });
+        });
+
+        zone.addEventListener('drop', function(e) {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files || !files.length) return;
+            const dt = new DataTransfer();
+            dt.items.add(files[0]);
+            input.files = dt.files;
+            setFileName(files[0]);
+        });
+    });
     </script>
     {% block scripts %}{% endblock %}
 </body>

@@ -630,11 +630,13 @@ def pk_spec_download(spec_id):
         "approved_by": request.form.get("approved_by", "").strip(),
         "approved_date": request.form.get("approved_date", "").strip(),
     }
+    route_method_to_reference = request.form.get("route_method_to_reference") == "on"
 
     output_path = generate_pk_spec_record(
         template_path, spec, parameters,
         completion_fields=completion_fields,
         attachment_paths=_get_attachment_paths("pk", spec_id),
+        route_method_to_reference=route_method_to_reference,
     )
     filename = f"PK-{spec['spec_number']}-Test-Record.docx"
     db.execute(
@@ -878,12 +880,14 @@ def rm_spec_download(spec_id):
         "approved_by": request.form.get("approved_by", "").strip(),
         "approved_date": request.form.get("approved_date", "").strip(),
     }
+    route_method_to_reference = request.form.get("route_method_to_reference") == "on"
 
     output_path = generate_rm_spec_record(
         template_path, spec, parameters,
         direct_params=direct_params, coa_params=coa_params,
         completion_fields=completion_fields,
         attachment_paths=_get_attachment_paths("rm", spec_id),
+        route_method_to_reference=route_method_to_reference,
     )
     filename = f"RM-{spec['spec_number']}-Test-Record.docx"
     db.execute(
@@ -1119,10 +1123,12 @@ def label_spec_download(spec_id):
         "approved_by": request.form.get("approved_by", "").strip(),
         "approved_date": request.form.get("approved_date", "").strip(),
     }
+    route_method_to_reference = request.form.get("route_method_to_reference") == "on"
     output_path = generate_pk_spec_record(
         template_path, spec, parameters,
         completion_fields=completion_fields,
         attachment_paths=_get_attachment_paths("label", spec_id),
+        route_method_to_reference=route_method_to_reference,
     )
     filename = f"{spec['spec_number']}-Specification-Record.docx"
     db.execute(

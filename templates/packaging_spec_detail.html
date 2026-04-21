@@ -182,8 +182,13 @@
         {% else %}
         <p style="color:var(--c13-text-muted);font-size:0.9rem;">No attachments yet.</p>
         {% endif %}
-        <form method="POST" action="{{ url_for('attachment_upload', spec_type='pk', spec_id=spec.id) }}" enctype="multipart/form-data" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.docx,.doc" required>
+        <form method="POST" action="{{ url_for('attachment_upload', spec_type='pk', spec_id=spec.id) }}" enctype="multipart/form-data" class="attachment-upload-form">
+            <div class="attachment-dropzone" data-attachment-dropzone>
+                <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.docx,.doc" required data-attachment-input>
+                <p class="attachment-dropzone-title">Drag &amp; drop attachment here</p>
+                <p class="attachment-dropzone-subtitle">or click to browse (PDF, JPG, PNG, DOC, DOCX)</p>
+                <p class="attachment-dropzone-file" data-attachment-file></p>
+            </div>
             <button type="submit" class="btn btn-outline btn-sm">Upload</button>
         </form>
     </div>

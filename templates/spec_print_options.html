@@ -45,9 +45,18 @@
                 <input type="text" name="approved_date" value="{{ spec.print_default_approved_date or '' }}" placeholder="MM/DD/YYYY">
             </div>
 
+            <div style="grid-column:1 / -1;display:flex;align-items:center;gap:10px;margin-top:4px;">
+                <input type="checkbox" id="route_method_to_reference" name="route_method_to_reference">
+                <label for="route_method_to_reference" style="margin:0;text-transform:none;letter-spacing:0;font-size:0.9rem;color:var(--c13-text);">
+                    Route test method to <strong>Reference</strong> column
+                </label>
+            </div>
+
             <div style="grid-column:1 / -1;display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
                 {% if spec_type == 'pk' %}
                 <a class="btn btn-outline" href="{{ url_for('pk_spec_detail', spec_id=spec.id) }}">Cancel</a>
+                {% elif spec_type == 'label' %}
+                <a class="btn btn-outline" href="{{ url_for('label_spec_detail', spec_id=spec.id) }}">Cancel</a>
                 {% else %}
                 <a class="btn btn-outline" href="{{ url_for('rm_spec_detail', spec_id=spec.id) }}">Cancel</a>
                 {% endif %}
