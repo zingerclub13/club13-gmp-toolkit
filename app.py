@@ -66,6 +66,30 @@ def _get_attachment_paths(spec_type, spec_id):
     return paths
 
 
+def _next_spec_number(spec_type):
+    """Generate next spec number for a spec type (PK/RM/LS)."""
+    mapping = {
+        "pk": ("packaging_specs", "PK"),
+        "rm": ("raw_material_specs", "RM"),
+        "label": ("label_specs", "LS"),
+    }
+    if spec_type not in mapping:
+        raise ValueError("Invalid spec type")
+
+    table, prefix = mapping[spec_type]
+    db = get_db()
+    rows = db.execute(f"SELECT spec_number FROM {table} WHERE spec_number LIKE ?", (f"{prefix}-%",)).fetchall()
+    max_n = 0
+    for r in rows:
+        spec_no = (r["spec_number"] or "").strip()
+        if not spec_no.startswith(f"{prefix}-"):
+            continue
+        suffix = spec_no.split("-", 1)[1]
+        if suffix.isdigit():
+            max_n = max(max_n, int(suffix))
+    return f"{prefix}-{max_n + 1:03d}"
+
+
 # ── Database helpers ────────────────────────────────────────────────
 def get_db():
     if "db" not in g:
@@ -182,6 +206,33 @@ def init_db():
             FOREIGN KEY (created_by) REFERENCES users(id)
         );
 
+        -- Label Specifications
+        CREATE TABLE IF NOT EXISTS label_specs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            spec_number TEXT NOT NULL UNIQUE,
+            material_name TEXT NOT NULL,
+            material_code TEXT,
+            supplier TEXT,
+            description TEXT,
+            status TEXT NOT NULL DEFAULT 'draft',
+            revision TEXT NOT NULL DEFAULT '00',
+            effective_date TEXT,
+            created_by INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS label_test_parameters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            spec_id INTEGER NOT NULL,
+            parameter_name TEXT NOT NULL,
+            test_method TEXT,
+            acceptance_criteria TEXT,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (spec_id) REFERENCES label_specs(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS rm_test_parameters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             spec_id INTEGER NOT NULL,
@@ -289,6 +340,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_rm_params_spec ON rm_test_parameters(spec_id);
         CREATE INDEX IF NOT EXISTS idx_rm_records_spec ON rm_test_records(spec_id);
         CREATE INDEX IF NOT EXISTS idx_rm_results_record ON rm_test_results(record_id);
+        CREATE INDEX IF NOT EXISTS idx_label_params_spec ON label_test_parameters(spec_id);
         CREATE INDEX IF NOT EXISTS idx_sop_number ON sops(sop_number);
         CREATE INDEX IF NOT EXISTS idx_sop_status ON sops(status);
         CREATE INDEX IF NOT EXISTS idx_doclog_type ON document_log(doc_type);
@@ -311,7 +363,7 @@ def init_db():
         )
 
     # Backwards-compatible schema additions for persisted print defaults
-    for table_name in ("packaging_specs", "raw_material_specs"):
+    for table_name in ("packaging_specs", "raw_material_specs", "label_specs"):
         _ensure_column(db, table_name, "print_default_lot_number TEXT DEFAULT ''")
         _ensure_column(db, table_name, "print_default_written_by TEXT DEFAULT ''")
         _ensure_column(db, table_name, "print_default_written_date TEXT DEFAULT ''")
@@ -441,7 +493,7 @@ def pk_specs_list():
 def pk_spec_new():
     if request.method == "POST":
         return _save_pk_spec(None)
-    return render_template("packaging_spec_form.html", spec=None, parameters=[])
+    return render_template("packaging_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("pk"))
 
 
 @app.route("/packaging-specs/<int:spec_id>/edit", methods=["GET", "POST"])
@@ -472,8 +524,10 @@ def _save_pk_spec(spec_id):
         "revision": request.form.get("revision", "00").strip(),
         "effective_date": request.form.get("effective_date", "").strip(),
     }
-    if not data["spec_number"] or not data["material_name"]:
-        flash("Spec number and material name are required.", "danger")
+    if not data["spec_number"]:
+        data["spec_number"] = _next_spec_number("pk")
+    if not data["material_name"]:
+        flash("Material name is required.", "danger")
         return redirect(request.url)
 
     if spec_id is None:
@@ -680,7 +734,7 @@ def rm_specs_list():
 def rm_spec_new():
     if request.method == "POST":
         return _save_rm_spec(None)
-    return render_template("raw_material_spec_form.html", spec=None, parameters=[])
+    return render_template("raw_material_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("rm"))
 
 
 @app.route("/raw-material-specs/<int:spec_id>/edit", methods=["GET", "POST"])
@@ -712,8 +766,10 @@ def _save_rm_spec(spec_id):
         "revision": request.form.get("revision", "00").strip(),
         "effective_date": request.form.get("effective_date", "").strip(),
     }
-    if not data["spec_number"] or not data["material_name"]:
-        flash("Spec number and material name are required.", "danger")
+    if not data["spec_number"]:
+        data["spec_number"] = _next_spec_number("rm")
+    if not data["material_name"]:
+        flash("Material name is required.", "danger")
         return redirect(request.url)
 
     if spec_id is None:
@@ -897,6 +953,216 @@ def rm_receiving_record(spec_id):
     )
     db.commit()
     return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+# ══════════════════════════════════════════════════════════════════
+# LABEL SPECIFICATIONS
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/label-specs")
+@login_required
+def label_specs_list():
+    db = get_db()
+    status_filter = request.args.get("status", "")
+    search = request.args.get("q", "")
+    query = "SELECT s.*, u.full_name as creator_name FROM label_specs s LEFT JOIN users u ON s.created_by = u.id WHERE 1=1"
+    params = []
+    if status_filter:
+        query += " AND s.status = ?"
+        params.append(status_filter)
+    if search:
+        query += " AND (s.spec_number LIKE ? OR s.material_name LIKE ? OR s.supplier LIKE ?)"
+        params.extend([f"%{search}%"] * 3)
+    query += " ORDER BY s.spec_number"
+    specs = db.execute(query, params).fetchall()
+    return render_template("label_specs.html", specs=specs, status_filter=status_filter, search=search)
+
+
+@app.route("/label-specs/new", methods=["GET", "POST"])
+@login_required
+def label_spec_new():
+    if request.method == "POST":
+        return _save_label_spec(None)
+    return render_template("label_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("label"))
+
+
+@app.route("/label-specs/<int:spec_id>/edit", methods=["GET", "POST"])
+@login_required
+def label_spec_edit(spec_id):
+    db = get_db()
+    spec = db.execute("SELECT * FROM label_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("label_specs_list"))
+    if request.method == "POST":
+        return _save_label_spec(spec_id)
+    parameters = db.execute(
+        "SELECT * FROM label_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    return render_template("label_spec_form.html", spec=spec, parameters=parameters)
+
+
+def _save_label_spec(spec_id):
+    db = get_db()
+    data = {
+        "spec_number": request.form.get("spec_number", "").strip(),
+        "material_name": request.form.get("material_name", "").strip(),
+        "material_code": request.form.get("material_code", "").strip(),
+        "supplier": request.form.get("supplier", "").strip(),
+        "description": request.form.get("description", "").strip(),
+        "status": request.form.get("status", "draft"),
+        "revision": request.form.get("revision", "00").strip(),
+        "effective_date": request.form.get("effective_date", "").strip(),
+    }
+    if not data["spec_number"]:
+        data["spec_number"] = _next_spec_number("label")
+    if not data["material_name"]:
+        flash("Material name is required.", "danger")
+        return redirect(request.url)
+
+    if spec_id is None:
+        existing = db.execute("SELECT id FROM label_specs WHERE spec_number = ?", (data["spec_number"],)).fetchone()
+        if existing:
+            flash("A spec with that number already exists.", "danger")
+            return redirect(request.url)
+        db.execute(
+            """INSERT INTO label_specs (spec_number, material_name, material_code, supplier, description, status, revision, effective_date, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (data["spec_number"], data["material_name"], data["material_code"], data["supplier"],
+             data["description"], data["status"], data["revision"], data["effective_date"], session["user_id"]),
+        )
+        spec_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        flash("Label specification created.", "success")
+    else:
+        db.execute(
+            """UPDATE label_specs SET spec_number=?, material_name=?, material_code=?, supplier=?,
+               description=?, status=?, revision=?, effective_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (data["spec_number"], data["material_name"], data["material_code"], data["supplier"],
+             data["description"], data["status"], data["revision"], data["effective_date"], spec_id),
+        )
+        flash("Label specification updated.", "success")
+
+    db.execute("DELETE FROM label_test_parameters WHERE spec_id = ?", (spec_id,))
+    param_names = request.form.getlist("param_name[]")
+    param_methods = request.form.getlist("param_method[]")
+    param_criteria = request.form.getlist("param_criteria[]")
+    for i, name in enumerate(param_names):
+        if name.strip():
+            method = param_methods[i] if i < len(param_methods) else ""
+            criteria = param_criteria[i] if i < len(param_criteria) else ""
+            db.execute(
+                "INSERT INTO label_test_parameters (spec_id, parameter_name, test_method, acceptance_criteria, sort_order) VALUES (?, ?, ?, ?, ?)",
+                (spec_id, name.strip(), method.strip(), criteria.strip(), i),
+            )
+    db.commit()
+    return redirect(url_for("label_spec_detail", spec_id=spec_id))
+
+
+@app.route("/label-specs/<int:spec_id>")
+@login_required
+def label_spec_detail(spec_id):
+    db = get_db()
+    spec = db.execute(
+        "SELECT s.*, u.full_name as creator_name FROM label_specs s LEFT JOIN users u ON s.created_by = u.id WHERE s.id = ?",
+        (spec_id,),
+    ).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("label_specs_list"))
+    parameters = db.execute(
+        "SELECT * FROM label_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    has_template = os.path.exists(os.path.join(TEMPLATE_DIR, "PK Specification Test Record Template.dotx"))
+    attachments = db.execute(
+        "SELECT a.*, u.full_name as uploader_name FROM spec_attachments a LEFT JOIN users u ON a.uploaded_by = u.id WHERE a.spec_type = 'label' AND a.spec_id = ? ORDER BY a.created_at",
+        (spec_id,),
+    ).fetchall()
+    return render_template("label_spec_detail.html", spec=spec, parameters=parameters, has_template=has_template, attachments=attachments)
+
+
+@app.route("/label-specs/<int:spec_id>/delete", methods=["POST"])
+@login_required
+@require_role("admin", "manager")
+def label_spec_delete(spec_id):
+    db = get_db()
+    db.execute("DELETE FROM label_specs WHERE id = ?", (spec_id,))
+    db.commit()
+    flash("Label specification deleted.", "success")
+    return redirect(url_for("label_specs_list"))
+
+
+@app.route("/label-specs/<int:spec_id>/download", methods=["GET", "POST"])
+@login_required
+def label_spec_download(spec_id):
+    from doc_generator import generate_pk_spec_record
+    db = get_db()
+    spec = db.execute("SELECT * FROM label_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("label_specs_list"))
+
+    if request.method == "GET":
+        return render_template("spec_print_options.html", spec=spec, spec_type="label")
+
+    parameters = db.execute(
+        "SELECT * FROM label_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    template_path = os.path.join(TEMPLATE_DIR, "PK Specification Test Record Template.dotx")
+    if not os.path.exists(template_path):
+        flash("Specification template not uploaded. Go to Settings > Templates.", "danger")
+        return redirect(url_for("label_spec_detail", spec_id=spec_id))
+
+    completion_fields = {
+        "lot_number": request.form.get("lot_number", "").strip(),
+        "written_by": request.form.get("written_by", "").strip(),
+        "written_date": request.form.get("written_date", "").strip(),
+        "approved_by": request.form.get("approved_by", "").strip(),
+        "approved_date": request.form.get("approved_date", "").strip(),
+    }
+    output_path = generate_pk_spec_record(
+        template_path, spec, parameters,
+        completion_fields=completion_fields,
+        attachment_paths=_get_attachment_paths("label", spec_id),
+    )
+    filename = f"{spec['spec_number']}-Specification-Record.docx"
+    db.execute(
+        "INSERT INTO document_log (doc_type, doc_id, action, filename, user_id) VALUES (?, ?, ?, ?, ?)",
+        ("label_spec", spec_id, "download", filename, session["user_id"]),
+    )
+    db.commit()
+    return send_file(output_path, as_attachment=True, download_name=filename)
+
+
+@app.route("/label-specs/<int:spec_id>/print-settings", methods=["POST"])
+@login_required
+def label_spec_print_settings(spec_id):
+    db = get_db()
+    spec = db.execute("SELECT id FROM label_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not spec:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("label_specs_list"))
+
+    db.execute(
+        """UPDATE label_specs
+           SET print_default_lot_number = ?,
+               print_default_written_by = ?,
+               print_default_written_date = ?,
+               print_default_approved_by = ?,
+               print_default_approved_date = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (
+            request.form.get("print_default_lot_number", "").strip(),
+            request.form.get("print_default_written_by", "").strip(),
+            request.form.get("print_default_written_date", "").strip(),
+            request.form.get("print_default_approved_by", "").strip(),
+            request.form.get("print_default_approved_date", "").strip(),
+            spec_id,
+        ),
+    )
+    db.commit()
+    flash("GMP print defaults saved.", "success")
+    return redirect(url_for("label_spec_detail", spec_id=spec_id))
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1420,11 +1686,16 @@ def template_upload():
 @app.route("/attachments/<spec_type>/<int:spec_id>/upload", methods=["POST"])
 @login_required
 def attachment_upload(spec_type, spec_id):
-    if spec_type not in ("pk", "rm"):
+    if spec_type not in ("pk", "rm", "label"):
         flash("Invalid spec type.", "danger")
         return redirect(url_for("dashboard"))
 
-    detail_url = url_for("pk_spec_detail" if spec_type == "pk" else "rm_spec_detail", spec_id=spec_id)
+    detail_endpoint = {
+        "pk": "pk_spec_detail",
+        "rm": "rm_spec_detail",
+        "label": "label_spec_detail",
+    }[spec_type]
+    detail_url = url_for(detail_endpoint, spec_id=spec_id)
 
     file = request.files.get("attachment")
     if not file or file.filename == "":
@@ -1468,10 +1739,15 @@ def attachment_delete(att_id):
         flash("Attachment not found.", "danger")
         return redirect(url_for("dashboard"))
 
-    detail_url = url_for(
-        "pk_spec_detail" if att["spec_type"] == "pk" else "rm_spec_detail",
-        spec_id=att["spec_id"],
-    )
+    detail_endpoint = {
+        "pk": "pk_spec_detail",
+        "rm": "rm_spec_detail",
+        "label": "label_spec_detail",
+    }.get(att["spec_type"])
+    if detail_endpoint is None:
+        flash("Invalid attachment spec type.", "danger")
+        return redirect(url_for("dashboard"))
+    detail_url = url_for(detail_endpoint, spec_id=att["spec_id"])
 
     # Remove file
     file_path = os.path.join(ATTACHMENTS_DIR, att["filename"])

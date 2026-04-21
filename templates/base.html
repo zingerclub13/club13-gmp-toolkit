@@ -46,6 +46,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                     Raw Material Specs
                 </a>
+                <a href="{{ url_for('label_specs_list') }}" class="nav-link {% if 'label_spec' in request.endpoint|default('') %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7"/><path d="M3 7h18"/><path d="M8 3h8v4H8z"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>
+                    Label Specs
+                </a>
 
                 <div class="nav-section">Documents</div>
                 <a href="{{ url_for('sops_list') }}" class="nav-link {% if 'sop' in request.endpoint|default('') %}active{% endif %}">

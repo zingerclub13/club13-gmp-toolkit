@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title_extra %} — Label Specs{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Label Specifications</h1>
+        <p>Manage label visual verification specifications (size, appearance, and supporting artwork)</p>
+    </div>
+    <a href="{{ url_for('label_spec_new') }}" class="btn btn-primary">+ New Spec</a>
+</div>
+
+<form class="filters-bar" method="GET">
+    <input type="text" class="form-control" name="q" placeholder="Search specs..." value="{{ search }}">
+    <select class="form-control" name="status" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        <option value="draft" {{ 'selected' if status_filter == 'draft' }}>Draft</option>
+        <option value="active" {{ 'selected' if status_filter == 'active' }}>Active</option>
+        <option value="superseded" {{ 'selected' if status_filter == 'superseded' }}>Superseded</option>
+    </select>
+    <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+</form>
+
+<div class="card">
+    <div class="card-body">
+        {% if specs %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Spec #</th>
+                        <th>Label Name</th>
+                        <th>Supplier</th>
+                        <th>Rev</th>
+                        <th>Status</th>
+                        <th>Effective Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in specs %}
+                    <tr>
+                        <td><a href="{{ url_for('label_spec_detail', spec_id=s.id) }}"><strong>{{ s.spec_number }}</strong></a></td>
+                        <td>{{ s.material_name }}</td>
+                        <td>{{ s.supplier or '—' }}</td>
+                        <td>{{ s.revision }}</td>
+                        <td><span class="badge badge-{{ s.status }}">{{ s.status|title }}</span></td>
+                        <td class="text-muted">{{ s.effective_date or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No label specifications found.</p>
+            <a href="{{ url_for('label_spec_new') }}" class="btn btn-primary">Create First Spec</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
