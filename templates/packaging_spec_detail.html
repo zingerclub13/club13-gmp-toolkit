@@ -16,6 +16,7 @@
         <a href="{{ url_for('pk_receiving_record', spec_id=spec.id) }}" class="btn btn-outline">⬇ Receiving Record</a>
         {% endif %}
         <a href="{{ url_for('pk_spec_edit', spec_id=spec.id) }}" class="btn btn-outline">Edit</a>
+        <a href="{{ url_for('pk_spec_duplicate', spec_id=spec.id) }}" class="btn btn-outline">Duplicate</a>
         {% if session.get('role') in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('pk_spec_delete', spec_id=spec.id) }}" style="display:inline;" onsubmit="return confirm('Delete this specification?')">
             <button type="submit" class="btn btn-danger btn-sm">Delete</button>

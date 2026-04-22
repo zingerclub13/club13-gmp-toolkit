@@ -20,48 +20,49 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="spec_number">Spec Number *</label>
-                    <input type="text" class="form-control" id="spec_number" name="spec_number" value="{{ spec.spec_number if spec else (suggested_spec_number or '') }}" required placeholder="Auto-generated (editable)">
+                    <input type="text" class="form-control" id="spec_number" name="spec_number" value="{{ spec.spec_number if spec else (prefill.spec_number if prefill else (suggested_spec_number or '')) }}" required placeholder="Auto-generated (editable)">
                 </div>
                 <div class="form-group">
                     <label for="material_name">Material Name *</label>
-                    <input type="text" class="form-control" id="material_name" name="material_name" value="{{ spec.material_name if spec else '' }}" required>
+                    <input type="text" class="form-control" id="material_name" name="material_name" value="{{ spec.material_name if spec else (prefill.material_name if prefill else '') }}" required>
                 </div>
                 <div class="form-group">
                     <label for="material_code">Material Code</label>
-                    <input type="text" class="form-control" id="material_code" name="material_code" value="{{ spec.material_code if spec else '' }}">
+                    <input type="text" class="form-control" id="material_code" name="material_code" value="{{ spec.material_code if spec else (prefill.material_code if prefill else '') }}">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="supplier">Supplier</label>
-                    <input type="text" class="form-control" id="supplier" name="supplier" value="{{ spec.supplier if spec else '' }}">
+                    <input type="text" class="form-control" id="supplier" name="supplier" value="{{ spec.supplier if spec else (prefill.supplier if prefill else '') }}">
                 </div>
                 <div class="form-group">
                     <label for="cas_number">CAS Number</label>
-                    <input type="text" class="form-control" id="cas_number" name="cas_number" value="{{ spec.cas_number if spec else '' }}" placeholder="e.g. 5743-28-2">
+                    <input type="text" class="form-control" id="cas_number" name="cas_number" value="{{ spec.cas_number if spec else (prefill.cas_number if prefill else '') }}" placeholder="e.g. 5743-28-2">
                 </div>
                 <div class="form-group">
                     <label for="revision">Revision</label>
-                    <input type="text" class="form-control" id="revision" name="revision" value="{{ spec.revision if spec else '00' }}">
+                    <input type="text" class="form-control" id="revision" name="revision" value="{{ spec.revision if spec else (prefill.revision if prefill else '00') }}">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="effective_date">Effective Date</label>
-                    <input type="date" class="form-control" id="effective_date" name="effective_date" value="{{ spec.effective_date if spec else '' }}">
+                    <input type="date" class="form-control" id="effective_date" name="effective_date" value="{{ spec.effective_date if spec else (prefill.effective_date if prefill else '') }}">
                 </div>
                 <div class="form-group">
                     <label for="status">Status</label>
                     <select class="form-control" id="status" name="status">
-                        <option value="draft" {{ 'selected' if spec and spec.status == 'draft' }}>Draft</option>
-                        <option value="active" {{ 'selected' if spec and spec.status == 'active' }}>Active</option>
-                        <option value="superseded" {{ 'selected' if spec and spec.status == 'superseded' }}>Superseded</option>
+                        {% set st = spec.status if spec else (prefill.status if prefill else 'draft') %}
+                        <option value="draft" {{ 'selected' if st == 'draft' }}>Draft</option>
+                        <option value="active" {{ 'selected' if st == 'active' }}>Active</option>
+                        <option value="superseded" {{ 'selected' if st == 'superseded' }}>Superseded</option>
                     </select>
                 </div>
             </div>
             <div class="form-group">
                 <label for="description">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3">{{ spec.description if spec else '' }}</textarea>
+                <textarea class="form-control" id="description" name="description" rows="3">{{ spec.description if spec else (prefill.description if prefill else '') }}</textarea>
             </div>
         </div>
     </div>

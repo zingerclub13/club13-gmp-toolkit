@@ -493,7 +493,33 @@ def pk_specs_list():
 def pk_spec_new():
     if request.method == "POST":
         return _save_pk_spec(None)
-    return render_template("packaging_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("pk"))
+    return render_template("packaging_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("pk"), prefill=None)
+
+
+@app.route("/packaging-specs/<int:spec_id>/duplicate", methods=["GET", "POST"])
+@login_required
+def pk_spec_duplicate(spec_id):
+    db = get_db()
+    source = db.execute("SELECT * FROM packaging_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not source:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("pk_specs_list"))
+
+    if request.method == "POST":
+        return _save_pk_spec(None)
+
+    parameters = db.execute(
+        "SELECT * FROM pk_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    prefill = dict(source)
+    prefill["spec_number"] = _next_spec_number("pk")
+    return render_template(
+        "packaging_spec_form.html",
+        spec=None,
+        parameters=parameters,
+        suggested_spec_number=prefill["spec_number"],
+        prefill=prefill,
+    )
 
 
 @app.route("/packaging-specs/<int:spec_id>/edit", methods=["GET", "POST"])
@@ -736,7 +762,33 @@ def rm_specs_list():
 def rm_spec_new():
     if request.method == "POST":
         return _save_rm_spec(None)
-    return render_template("raw_material_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("rm"))
+    return render_template("raw_material_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("rm"), prefill=None)
+
+
+@app.route("/raw-material-specs/<int:spec_id>/duplicate", methods=["GET", "POST"])
+@login_required
+def rm_spec_duplicate(spec_id):
+    db = get_db()
+    source = db.execute("SELECT * FROM raw_material_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not source:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("rm_specs_list"))
+
+    if request.method == "POST":
+        return _save_rm_spec(None)
+
+    parameters = db.execute(
+        "SELECT * FROM rm_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    prefill = dict(source)
+    prefill["spec_number"] = _next_spec_number("rm")
+    return render_template(
+        "raw_material_spec_form.html",
+        spec=None,
+        parameters=parameters,
+        suggested_spec_number=prefill["spec_number"],
+        prefill=prefill,
+    )
 
 
 @app.route("/raw-material-specs/<int:spec_id>/edit", methods=["GET", "POST"])
@@ -987,7 +1039,33 @@ def label_specs_list():
 def label_spec_new():
     if request.method == "POST":
         return _save_label_spec(None)
-    return render_template("label_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("label"))
+    return render_template("label_spec_form.html", spec=None, parameters=[], suggested_spec_number=_next_spec_number("label"), prefill=None)
+
+
+@app.route("/label-specs/<int:spec_id>/duplicate", methods=["GET", "POST"])
+@login_required
+def label_spec_duplicate(spec_id):
+    db = get_db()
+    source = db.execute("SELECT * FROM label_specs WHERE id = ?", (spec_id,)).fetchone()
+    if not source:
+        flash("Specification not found.", "danger")
+        return redirect(url_for("label_specs_list"))
+
+    if request.method == "POST":
+        return _save_label_spec(None)
+
+    parameters = db.execute(
+        "SELECT * FROM label_test_parameters WHERE spec_id = ? ORDER BY sort_order", (spec_id,)
+    ).fetchall()
+    prefill = dict(source)
+    prefill["spec_number"] = _next_spec_number("label")
+    return render_template(
+        "label_spec_form.html",
+        spec=None,
+        parameters=parameters,
+        suggested_spec_number=prefill["spec_number"],
+        prefill=prefill,
+    )
 
 
 @app.route("/label-specs/<int:spec_id>/edit", methods=["GET", "POST"])
